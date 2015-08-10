@@ -1,0 +1,9 @@
+Flask
+Flask-Script
+Flask-Restplus
+selenium
+Flask-CORS
+Flask-SQLAlchemy
+requests
+
+# Also needs: phobos
