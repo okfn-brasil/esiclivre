@@ -18,7 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
 
-from __future__ import unicode_literals  # unicode by default
+# from __future__ import unicode_literals  # unicode by default
 
 import os
 import requests
@@ -30,6 +30,7 @@ from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+import speech_recognition as sr
 
 from extensions import db
 from models import Entidades, Pedidos
@@ -48,8 +49,6 @@ class ESicLivre(object):
         self.pasta = pasta
         self.email = email
         self.senha = senha
-        # with open(user_profile, 'r') as f:
-        #     self.email, self.senha = f.readlines()
 
         self.navegador = None
         self.app = None
@@ -58,11 +57,11 @@ class ESicLivre(object):
         self.safe_dict = manager.dict()
         self.clear_captcha()
         self.stop()
-        # self.texto_captcha = None
 
+        self.try_break_audio_captcha = True
         self.nome_audio_captcha = "somCaptcha.wav"
-        # # Nome do arquivo baixado do sistema
-        # self.arquivo = "Novo documento do Web Intelligence.csv"
+        self.recognizer = sr.Recognizer("pt-BR")
+
         self.user_agent = (
             "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:28.0)"
             " Gecko/20100101  Firefox/28.0"
@@ -108,8 +107,15 @@ class ESicLivre(object):
     def ir_para_login(self):
         self.navegador.get(self.base_url + "/Account/Login.aspx")
 
-    # def tocar_captcha(self):
-    #     self.navegador.find_element_by_id("btnTocar").click()
+    def transcribe_audio_captcha(self):
+        print("Transcribing audio captcha...")
+        audio_path = os.path.join(self.pasta, self.nome_audio_captcha)
+        with sr.WavFile(audio_path) as source:
+            audio = self.recognizer.record(source)
+        try:
+            return self.recognizer.recognize(audio)
+        except LookupError:
+            return None
 
     def baixar_audio_captcha(self):
         # Removes the last downloaded audio file, avoiding adding (1) to
@@ -119,6 +125,7 @@ class ESicLivre(object):
             os.remove(cam_audio)
         except (OSError, IOError):
             pass
+        print("Downloading audio captcha...")
         # Esse número deve ser usado para evitar problemas com a cache
         n = random.randint(1, 400)
         link = self.base_url + "/Account/pgAudio.ashx?%s" % n
@@ -127,9 +134,9 @@ class ESicLivre(object):
         while self.nome_audio_captcha + ".part" in os.listdir(self.pasta):
             time.sleep(1)
 
-        c = "ffmpeg -i {e} -ar 16000 {s} -y".format(e=cam_audio,
-                                                    s=cam_audio[:-4] + "2.wav")
-        os.system(c)
+        # c = "ffmpeg -i {e} -ar 16000 {s} -y".format(e=cam_audio,
+        #                                             s=cam_audio[:-4] + "2.wav")
+        # os.system(c)
 
     def baixar_imagem_captcha(self):
         # Removes the last downloaded audio file, avoiding adding (1) to
@@ -159,7 +166,7 @@ class ESicLivre(object):
             # 'Connection': keep-alive
 
             # 'Cookie': 'ASP.NET_SessionId=dgsonyd4zczcipg2vs3xgn0l'
-            'Cookie': '{c}={v}'.format(c=nome, v=cookie['value'])
+            'Cookie': '{0}={1}'.format(nome, cookie['value'])
         }
 
         r = requests.get(link, stream=True, headers=headers)
@@ -178,6 +185,10 @@ class ESicLivre(object):
         self.navegador.find_element_by_id(
             "ctl00_MainContent_btnEnviar").click()
 
+    def clicar_recorrer(self):
+        self.navegador.find_element_by_id(
+            "ctl00_MainContent_btnSolicitarEsclarecimento").click()
+
     def entrar_dados_login(self, captcha):
         params = {
             "ctl00_MainContent_txt_email": self.email,
@@ -188,9 +199,6 @@ class ESicLivre(object):
             element = self.navegador.find_element_by_id(k)
             element.clear()
             element.send_keys(v)
-
-        # self.navegador.find_element_by_id(
-        #     "ctl00_MainContent_txtValorCaptcha").send_keys(captcha)
 
     def entrar_no_sistema(self, captcha):
         if not self.esta_em_login():
@@ -277,6 +285,22 @@ class ESicLivre(object):
         process = Process(target=self.__run__)
         process.start()
 
+    def take_care_of_captcha(self):
+        if not self.esta_em_login():
+            self.ir_para_login()
+        f = True
+        while f:
+            self.baixar_audio_captcha()
+            captcha = self.transcribe_audio_captcha()
+            captcha = captcha.replace("ver ", "v")
+            captcha = captcha.replace(" ", "")
+            print(captcha)
+            if len(captcha) == 4:
+                break
+            else:
+                self.gerar_novo_captcha()
+        return captcha
+
     def __run__(self):
         if not self.safe_dict['running']:
             with self.app.app_context():
@@ -301,7 +325,11 @@ class ESicLivre(object):
     # Subprocess Functions
 
     def main_loop(self):
-        captcha = self.get_captcha()
+        if self.try_break_audio_captcha:
+            captcha = self.take_care_of_captcha()
+        else:
+            captcha = self.get_captcha()
+
         print("ZzzzZZzzzZZz", captcha)
         # If captcha is unset, needs to wait someone to set it
         # If is set, login
