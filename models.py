@@ -23,8 +23,6 @@ class Pedido(db.Model):
     messages = db.relationship("Message", backref="pedido")
     protocolo = db.Column(db.Integer, nullable=True)
     deadline = db.Column(db.DateTime, nullable=True, default=None)
-    # Tells if there is an unsent message related with this pedido
-    # unsent = db.Column(db.Boolean, nullable=False, default=True)
 
     # State of this pedido
     # 0 - created, but not sent
