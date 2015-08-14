@@ -39,8 +39,8 @@ def create_app():
 
     # Avoids starting the browser when manager loads
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        # browser.start(active_loop, app)
         browser.start()
+        pass
 
     # API
     api.init_app(app)

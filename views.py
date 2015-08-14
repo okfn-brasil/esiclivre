@@ -9,7 +9,7 @@ from multiprocessing import Process
 from sqlalchemy.orm.exc import NoResultFound
 from flask.ext.restplus import Resource, Api, apidoc
 
-from models import Entidades, Author, Pedidos
+from models import Orgao, Author, Pedido, Message
 from extensions import db, sv
 
 
@@ -18,14 +18,13 @@ api = Api(version='1.0',
           description='ESIC')
 
 
-@api.route('/entidades')
-class ListEntidades(Resource):
+@api.route('/orgaos')
+class ListOrgaos(Resource):
 
     def get(self):
-        # a = [i[0] for i in db.session.query(Entidades.name).all()]
-        # import IPython; IPython.embed()
-        # return a
-        return [i[0] for i in db.session.query(Entidades.name).all()]
+        return {
+            "orgaos": [i[0] for i in db.session.query(Orgao.name).all()]
+        }
 
 
 @api.route('/captcha/<string:value>')
@@ -43,6 +42,7 @@ class NewPedido(Resource):
     parser = api.parser()
     parser.add_argument('token', location='json')
     parser.add_argument('text', location='json')
+    parser.add_argument('orgao', location='json')
 
     def post(self):
         args = self.parser.parse_args()
@@ -55,18 +55,19 @@ class NewPedido(Resource):
 
         # TODO: validar text (XSS)
         text = args['text']
-
         # Size limit enforced by eSIC
         if len(text) > 6000:
             api.abort(400, "Text size limit exceeded")
 
-        # TODO: ver se é válida
-        entidade = args['entidade']
-
-        # author_name = "alguem"
-        # text = """
-        # """
-        # entidade = u"CGM - Controladoria Geral do Município"
+        # Validate 'orgao'
+        if args['orgao']:
+            try:
+                orgao = (db.session.query(Orgao.name)
+                         .filter(Orgao.name == args['orgao']).one())
+            except NoResultFound:
+                api.abort(400, "Orgao not found")
+        else:
+            api.abort(400, "No Orgao specified")
 
         # Get author (add if needed)
         try:
@@ -79,9 +80,12 @@ class NewPedido(Resource):
             author_id = author.id
 
         now = datetime.now()
-        pedido = Pedidos(author_id=author_id, text=text,
-                         entidade=entidade, received=now)
+        pedido = Pedido(author_id=author_id, orgao=orgao)
         db.session.add(pedido)
+        db.session.commit()
+        message = Message(pedido_id=pedido.id, received=now, text=text,
+                          order=0)
+        db.session.add(message)
         db.session.commit()
         return {}
 

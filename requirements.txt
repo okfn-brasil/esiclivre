@@ -1,9 +1,10 @@
 Flask
 Flask-Script
 Flask-Restplus
-selenium
 Flask-CORS
 Flask-SQLAlchemy
+selenium
 requests
+speechrecognition
 
-# Also needs: phobos
+# Also needs: viratoken

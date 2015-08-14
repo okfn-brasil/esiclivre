@@ -33,7 +33,7 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 import speech_recognition as sr
 
 from extensions import db
-from models import Entidades, Pedidos
+from models import Orgao, Pedido
 
 
 class LoginNeeded(Exception):
@@ -211,15 +211,15 @@ class ESicLivre(object):
         self.baixar_imagem_captcha()
         self.clear_captcha()
 
-    def criar_dicio_entidades(self):
-        """Cria o dicionário com as entidades e botões para selecioná-las.
+    def criar_dicio_orgaos(self):
+        """Cria o dicionário com os órgãos e botões para selecioná-los.
         Precisa estar na página de 'Registrar Pedido'."""
         # Pega todos os elementos "options" dentro do seletor
         select = self.navegador.find_element_by_id(
             "ctl00_MainContent_ddl_orgao")
         options = select.find_elements_by_tag_name("option")
-        # Cria dicionário (nome da entidade: elemento da interface que pode ser
-        # clicado para selecioná-la). Exclui o primeiro item que é "Selecione".
+        # Cria dicionário (nome do órgão: elemento da interface que pode ser
+        # clicado para selecioná-lo). Exclui o primeiro item que é "Selecione".
         return dict([(i.text, i) for i in options[1:]])
 
     def entrar_com_texto_pedido(self, texto):
@@ -232,7 +232,8 @@ class ESicLivre(object):
 
     def clicar_enviar_pedido(self):
         # Enviar pedido de informação
-        # self.navegador.find_element_by_id("ctl00_MainContent_btnEnviarAntes").click()
+        self.navegador.find_element_by_id(
+            "ctl00_MainContent_btnEnviarAntes").click()
         pass
 
     def check_login_needed(self):
@@ -241,17 +242,17 @@ class ESicLivre(object):
 
     # Funções Gerais
 
-    def postar_pedido(self, entidade, texto):
+    def postar_pedido(self, orgao, texto):
         print("A")
         self.ir_para_registrar_pedido()
         print("B")
         self.check_login_needed()
         print("C")
         # TODO: testar se está na página de fazer pedido
-        entidades = self.criar_dicio_entidades()
+        orgaos = self.criar_dicio_orgaos()
         print("D")
-        # TODO: testar se entidade existe
-        entidades[entidade].click()
+        # TODO: testar se órgão existe
+        orgaos[orgao].click()
         self.entrar_com_texto_pedido(texto)
         self.clicar_enviar_pedido()
         print("E")
@@ -260,13 +261,19 @@ class ESicLivre(object):
         protocolo = self.navegador.find_element_by_id(
             "ctl00_MainContent_lbl_protocolo_confirmar"
         ).text
-        # TODO: retornar prazo também!
-        return protocolo
+        deadline = self.navegador.find_element_by_id(
+            "ctl00_MainContent_lbl_prazo_atendimento_confirmar"
+        ).text
+        # ctl00_MainContent_lbl_data_solicitacao_confirmar
+        # ctl00_MainContent_lbl_descricao_pedido_confirmar
+        # ctl00_MainContent_lbl_orgao_confirmar
+        # ctl00_MainContent_lbl_solicitante_confirmar
+        return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
 
-    def lista_de_entidades(self):
+    def lista_de_orgaos(self):
         self.ir_para_registrar_pedido()
         # TODO: ver se realmente está na página
-        return self.criar_dicio_entidades().keys()
+        return self.criar_dicio_orgaos().keys()
 
     def set_captcha(self, value):
         self.safe_dict['captcha'] = value
@@ -292,13 +299,13 @@ class ESicLivre(object):
         while f:
             self.baixar_audio_captcha()
             captcha = self.transcribe_audio_captcha()
-            captcha = captcha.replace("ver ", "v")
-            captcha = captcha.replace(" ", "")
-            print(captcha)
-            if len(captcha) == 4:
-                break
-            else:
-                self.gerar_novo_captcha()
+            if captcha:
+                captcha = captcha.replace("ver ", "v")
+                captcha = captcha.replace(" ", "")
+                print(captcha)
+                if len(captcha) == 4:
+                    break
+            self.gerar_novo_captcha()
         return captcha
 
     def __run__(self):
@@ -337,9 +344,10 @@ class ESicLivre(object):
             self.entrar_no_sistema(captcha)
             if not self.esta_em_login():
                 try:
-                    # Loads entidades list if empty
-                    if not db.session.query(Entidades.name).all():
-                        self.update_entidades_list()
+                    # Loads orgaos list if empty (or with only test data)
+                    orgaos = db.session.query(Orgao.name).all()
+                    if len(orgaos) < 5:
+                        self.update_orgaos_list()
 
                     counter = 0
                     while self.safe_dict['running']:
@@ -361,22 +369,27 @@ class ESicLivre(object):
 
     def active_loop(self):
         """Does routine stuff inside eSIC, like posting pedidos."""
-        not_sent = db.session.query(Pedidos).filter(Pedidos.sent == None).all()
-        for pedido in not_sent:
+        new_pedidos = Pedido.get_new_pedidos()
+        # Send new pedidos
+        for pedido in new_pedidos:
             print(pedido)
-            protocolo, prazo = self.postar_pedido(pedido.entidade, pedido.text)
+            message = pedido.get_initial_message()
+            protocolo, deadline = self.postar_pedido(pedido.orgao,
+                                                     message.text)
             pedido.protocolo = int(protocolo)
-            pedido.sent = datetime.now()
+            pedido.deadline = deadline
+            pedido.initial_message_sent()
+            message.sent = datetime.now()
             db.session.commit()
         # TODO: ver se quem quer recorrer
         # TODO: ver precisa olhar respostas aos pedidos
         print("Feito")
 
-    def update_entidades_list(self):
+    def update_orgaos_list(self):
         # Clear table
-        db.session.query(Entidades).delete()
-        # Add entidades from site
-        for ent in self.lista_de_entidades():
-            model_ent = Entidades(name=ent)
-            db.session.add(model_ent)
+        db.session.query(Orgao).delete()
+        # Add orgaos from site
+        for org in self.lista_de_orgaos():
+            model_org = Orgao(name=org)
+            db.session.add(model_org)
         db.session.commit()
