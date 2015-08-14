@@ -17,14 +17,15 @@ from browser import ESicLivre
 def create_app():
     # App
     app = Flask(__name__)
-    app.config.from_pyfile('settings/common.py', silent=False)
-    app.config.from_pyfile('settings/local_settings.py', silent=False)
+    app.config.from_pyfile('../settings/common.py', silent=False)
+    app.config.from_pyfile('../settings/local_settings.py', silent=False)
     CORS(app, resources={r"*": {"origins": "*"}})
 
     # DB
     db.init_app(app)
 
     # Signer/Verifier
+    print(os.getcwd())
     sv.config(pub_key_path="settings/keypub")
 
     # Browser
@@ -39,7 +40,7 @@ def create_app():
 
     # Avoids starting the browser when manager loads
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        browser.start()
+        # browser.start()
         pass
 
     # API

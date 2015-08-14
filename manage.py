@@ -5,7 +5,7 @@ from __future__ import unicode_literals  # unicode by default
 
 from flask.ext.script import Server, Manager, Shell
 
-from app import create_app, db, sv
+from esiclivre.app import create_app, db, sv
 
 
 # manager = Manager(app)
