@@ -2,12 +2,13 @@
 # coding: utf-8
 
 from __future__ import unicode_literals  # unicode by default
-
 from datetime import datetime
 from multiprocessing import Process
 
 from sqlalchemy.orm.exc import NoResultFound
 from flask.ext.restplus import Resource, Api, apidoc
+
+from viralata.utils import decode_token
 
 from models import Orgao, Author, Pedido, Message
 from extensions import db, sv
@@ -46,11 +47,7 @@ class NewPedido(Resource):
 
     def post(self):
         args = self.parser.parse_args()
-        try:
-            decoded = sv.decode(args['token'])
-        except:
-            # TODO: tratar erros...
-            raise
+        decoded = decode_token(args['token'], sv, api)
         author_name = decoded['username']
 
         # TODO: validar text (XSS)
@@ -90,5 +87,36 @@ class NewPedido(Resource):
         return {}
 
 
+@api.route('/pedidos/<int:protocolo>')
+class GetPedido(Resource):
+
+    def get(self, protocolo):
+        try:
+            pedido = (db.session.query(Pedido)
+                      .filter(Pedido.protocolo == protocolo).one())
+        except NoResultFound:
+            api.abort(404)
+        return {
+            'protocolo': pedido.protocolo,
+            'orgao': pedido.orgao,
+            'autor': pedido.author.name,
+            'deadline': format_date(pedido.deadline),
+            'messages': [
+                {
+                    'text': m.text,
+                    'received': format_date(m.received),
+                    'sent': format_date(m.sent),
+                    # TODO: como colocar o anexo aqui? link para download?
+                }
+                # TODO: precisa dar sort?
+                for m in pedido.messages
+            ]
+        }
+
+
 def set_captcha_func(value):
     api.browser.set_captcha(value)
+
+
+def format_date(date):
+    return date.strftime("%d/%m/%Y")
