@@ -10,7 +10,7 @@ from flask.ext.restplus import Resource, Api, apidoc
 
 from viralata.utils import decode_token
 
-from models import Orgao, Author, Pedido, Message
+from models import Orgao, Author, Pedido, Message, Keyword
 from extensions import db, sv
 
 
@@ -44,6 +44,7 @@ class NewPedido(Resource):
     parser.add_argument('token', location='json')
     parser.add_argument('text', location='json')
     parser.add_argument('orgao', location='json')
+    parser.add_argument('keywords', location='json', type=list)
 
     def post(self):
         args = self.parser.parse_args()
@@ -60,7 +61,7 @@ class NewPedido(Resource):
         if args['orgao']:
             try:
                 orgao = (db.session.query(Orgao.name)
-                         .filter(Orgao.name == args['orgao']).one())
+                         .filter_by(name=args['orgao']).one())
             except NoResultFound:
                 api.abort(400, "Orgao not found")
         else:
@@ -69,7 +70,7 @@ class NewPedido(Resource):
         # Get author (add if needed)
         try:
             author_id = (db.session.query(Author.id)
-                         .filter(Author.name == author_name).one())
+                         .filter_by(name=author_name).one())
         except NoResultFound:
             author = Author(name=author_name)
             db.session.add(author)
@@ -78,6 +79,18 @@ class NewPedido(Resource):
 
         now = datetime.now()
         pedido = Pedido(author_id=author_id, orgao=orgao)
+
+        # Set keywords
+        for keyword_name in args['keywords']:
+            try:
+                keyword = (db.session.query(Keyword)
+                           .filter_by(name=keyword_name).one())
+            except NoResultFound:
+                keyword = Keyword(keyword_name)
+                db.session.add(keyword)
+                db.session.commit()
+            pedido.keywords.append(keyword)
+
         db.session.add(pedido)
         db.session.commit()
         message = Message(pedido_id=pedido.id, received=now, text=text,
@@ -87,19 +100,20 @@ class NewPedido(Resource):
         return {}
 
 
-@api.route('/pedidos/<int:protocolo>')
-class GetPedido(Resource):
+@api.route('/pedidos/protocolo/<int:protocolo>')
+class GetPedidoProtocolo(Resource):
 
     def get(self, protocolo):
         try:
             pedido = (db.session.query(Pedido)
-                      .filter(Pedido.protocolo == protocolo).one())
+                      .filter_by(protocolo=protocolo).one())
         except NoResultFound:
             api.abort(404)
         return {
             'protocolo': pedido.protocolo,
             'orgao': pedido.orgao,
             'autor': pedido.author.name,
+            'state': pedido.get_state(),
             'deadline': format_date(pedido.deadline),
             'messages': [
                 {
@@ -110,6 +124,29 @@ class GetPedido(Resource):
                 }
                 # TODO: precisa dar sort?
                 for m in pedido.messages
+            ]
+        }
+
+
+@api.route('/pessoa/<string:name>')
+class GetAuthor(Resource):
+
+    def get(self, name):
+        try:
+            author = (db.session.query(Author)
+                      .filter_by(name=name).one())
+        except NoResultFound:
+            api.abort(404)
+        return {
+            'name': author.name,
+            'pedidos': [
+                {
+                    'protocolo': p.protocolo,
+                    'orgao': p.orgao,
+                    'state': p.get_state(),
+                    'deadline': format_date(p.deadline),
+                }
+                for p in author.pedidos
             ]
         }
 
