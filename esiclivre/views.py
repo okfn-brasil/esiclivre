@@ -15,8 +15,9 @@ from extensions import db, sv
 
 
 api = Api(version='1.0',
-          title='esic',
-          description='ESIC')
+          title='EsicLivre',
+          description='A microservice for eSIC interaction. All non-get '
+          'operations require a micro token.')
 
 
 @api.route('/orgaos')
