@@ -23,6 +23,7 @@ api = Api(version='1.0',
 class ListOrgaos(Resource):
 
     def get(self):
+        '''List orgaos.'''
         return {
             "orgaos": [i[0] for i in db.session.query(Orgao.name).all()]
         }
@@ -32,6 +33,7 @@ class ListOrgaos(Resource):
 class SetCaptcha(Resource):
 
     def get(self, value):
+        '''Sets a captcha to be tried by the browser.'''
         process = Process(target=set_captcha_func, args=(value,))
         process.start()
         return {}
@@ -47,6 +49,7 @@ class NewPedido(Resource):
     parser.add_argument('keywords', location='json', type=list)
 
     def post(self):
+        '''Adds a new pedido to be submited to eSIC.'''
         args = self.parser.parse_args()
         decoded = decode_token(args['token'], sv, api)
         author_name = decoded['username']
@@ -104,34 +107,67 @@ class NewPedido(Resource):
 class GetPedidoProtocolo(Resource):
 
     def get(self, protocolo):
+        '''Returns a pedido by its protocolo.'''
         try:
             pedido = (db.session.query(Pedido)
                       .filter_by(protocolo=protocolo).one())
         except NoResultFound:
             api.abort(404)
+        return pedido_to_json(pedido)
+
+
+@api.route('/pedidos/id/<int:id_number>')
+class GetPedidoId(Resource):
+
+    def get(self, id_number):
+        '''Returns a pedido by its id.'''
+        try:
+            pedido = (db.session.query(Pedido)
+                      .filter_by(id=id_number).one())
+        except NoResultFound:
+            api.abort(404)
+        return pedido_to_json(pedido)
+
+
+@api.route('/keywords/<string:keyword_name>')
+class GetKeyword(Resource):
+
+    def get(self, keyword_name):
+        '''Returns pedidos marked with a specific keyword.'''
+        try:
+            keyword = (db.session.query(Keyword)
+                       .filter_by(name=keyword_name).one())
+        except NoResultFound:
+            api.abort(404)
         return {
-            'protocolo': pedido.protocolo,
-            'orgao': pedido.orgao,
-            'autor': pedido.author.name,
-            'state': pedido.get_state(),
-            'deadline': format_date(pedido.deadline),
-            'messages': [
+            'name': keyword.name,
+            'pedidos': [
                 {
-                    'text': m.text,
-                    'received': format_date(m.received),
-                    'sent': format_date(m.sent),
-                    # TODO: como colocar o anexo aqui? link para download?
+                    'id': pedido.id,
+                    'protoloco': pedido.protocolo,
                 }
-                # TODO: precisa dar sort?
-                for m in pedido.messages
+                for pedido in keyword.pedidos
             ]
         }
 
 
-@api.route('/pessoa/<string:name>')
+@api.route('/keywords')
+class ListKeywords(Resource):
+
+    def get(self):
+        '''List keywords.'''
+        keywords = db.session.query(Keyword.name).all()
+
+        return {
+            "keywords": [k[0] for k in keywords]
+        }
+
+
+@api.route('/authors/<string:name>')
 class GetAuthor(Resource):
 
     def get(self, name):
+        '''Returns pedidos marked with a specific keyword.'''
         try:
             author = (db.session.query(Author)
                       .filter_by(name=name).one())
@@ -141,19 +177,62 @@ class GetAuthor(Resource):
             'name': author.name,
             'pedidos': [
                 {
+                    'id': p.id,
                     'protocolo': p.protocolo,
                     'orgao': p.orgao,
                     'state': p.get_state(),
                     'deadline': format_date(p.deadline),
+                    'keywords': list(p.kw),
                 }
                 for p in author.pedidos
             ]
         }
 
 
+@api.route('/authors')
+class ListAuthors(Resource):
+
+    def get(self):
+        '''List authors.'''
+        authors = db.session.query(Author.name).all()
+
+        return {
+            "authors": [a[0] for a in authors]
+        }
+
+
 def set_captcha_func(value):
+    '''Sets a captcha to be tried by the browser.'''
     api.browser.set_captcha(value)
 
 
 def format_date(date):
-    return date.strftime("%d/%m/%Y")
+    '''Helper to format dates.'''
+    if date:
+        return date.strftime("%d/%m/%Y")
+    else:
+        return None
+
+
+def pedido_to_json(pedido):
+    '''Returns detailed information about a pedido.'''
+    return {
+        'id': pedido.id,
+        'protocolo': pedido.protocolo,
+        'orgao': pedido.orgao,
+        'autor': pedido.author.name,
+        'state': pedido.get_state(),
+        'deadline': format_date(pedido.deadline),
+        'keywords': pedido.kw,
+        'messages': [
+            {
+                'text': m.text,
+                'order': m.order,
+                'received': format_date(m.received),
+                'sent': format_date(m.sent),
+                # TODO: como colocar o anexo aqui? link para download?
+            }
+            # TODO: precisa dar sort?
+            for m in pedido.messages
+        ]
+    }
