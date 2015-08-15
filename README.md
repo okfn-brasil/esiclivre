@@ -6,7 +6,7 @@ Micro serviço para interação com o eSIC municipal de São Paulo.
 ## Install
 
 ```
-$ python setup.py install
+$ python setup.py develop
 ```
 
 Se está usando Postgres:
