@@ -19,7 +19,7 @@ pedido_keyword = db.Table(
 class Orgao(db.Model):
     __tablename__ = 'orgao'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(256), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
 
 
 class Pedido(db.Model):
@@ -27,7 +27,7 @@ class Pedido(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     # Using name as string and not ID for orgao table, because I think the
     # orgaos may change at any moment...
-    orgao = db.Column(db.String(256), nullable=False)
+    orgao = db.Column(db.String(200), nullable=False)
     author_id = db.Column(db.Integer, db.ForeignKey('author.id'),
                           nullable=False)
     messages = db.relationship("Message", backref="pedido")
@@ -87,14 +87,14 @@ class Message(db.Model):
 class Author(db.Model):
     __tablename__ = 'author'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(128), nullable=False, unique=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
     pedidos = db.relationship("Pedido", backref="author")
 
 
 class Keyword(db.Model):
     __tablename__ = 'keyword'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(256), nullable=False, unique=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
     pedidos = db.relationship("Pedido",
                               secondary=pedido_keyword,
                               backref="keywords")
