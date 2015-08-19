@@ -80,7 +80,7 @@ class ESicLivre(object):
     def criar_navegador(self):
         """Retorna um navegador firefox configurado para salvar arquivos
         baixados em 'pasta'."""
-        print("Configurando e iniciando navegador")
+        print("Configuring and initiating browser...")
         fp = webdriver.FirefoxProfile()
         fp.set_preference("browser.download.folderList", 2)
         fp.set_preference("browser.download.manager.showWhenStarting", False)
@@ -243,20 +243,21 @@ class ESicLivre(object):
     # Funções Gerais
 
     def postar_pedido(self, orgao, texto):
-        print("A")
+        print("> going to new pedido page")
         self.ir_para_registrar_pedido()
-        print("B")
         self.check_login_needed()
-        print("C")
         # TODO: testar se está na página de fazer pedido
+        print("> getting orgaos buttons")
         orgaos = self.criar_dicio_orgaos()
-        print("D")
         # TODO: testar se órgão existe
+        print("> selecting orgao")
         orgaos[orgao].click()
+        print("> pedido text to input")
         self.entrar_com_texto_pedido(texto)
+        print("> sending...")
         self.clicar_enviar_pedido()
-        print("E")
 
+        print("> getting protocolo")
         # Returns protocolo
         protocolo = self.navegador.find_element_by_id(
             "ctl00_MainContent_lbl_protocolo_confirmar"
@@ -302,7 +303,7 @@ class ESicLivre(object):
             if captcha:
                 captcha = captcha.replace("ver ", "v")
                 captcha = captcha.replace(" ", "")
-                print(captcha)
+                print("Transcribed captcha: %s" % captcha)
                 if len(captcha) == 4:
                     break
             self.gerar_novo_captcha()
@@ -310,8 +311,9 @@ class ESicLivre(object):
 
     def __run__(self):
         if not self.safe_dict['running']:
+            # Get context needed for DB
             with self.app.app_context():
-                print("STATE", self.safe_dict['running'])
+                # Set flag that can be used later to stop running
                 self.safe_dict['running'] = True
                 self.criar_navegador()
 
@@ -337,12 +339,14 @@ class ESicLivre(object):
         else:
             captcha = self.get_captcha()
 
-        print("ZzzzZZzzzZZz", captcha)
-        # If captcha is unset, needs to wait someone to set it
+        print("Current captcha: %s" % captcha)
+        # If captcha is unset, may need to wait someone to set it
         # If is set, login
         if captcha:
+            print("Trying to login...")
             self.entrar_no_sistema(captcha)
             if not self.esta_em_login():
+                print("Seems to have logged in!")
                 try:
                     # Loads orgaos list if empty (or with only test data)
                     orgaos = db.session.query(Orgao.name).all()
@@ -364,7 +368,8 @@ class ESicLivre(object):
                         time.sleep(5)
 
                 except LoginNeeded:
-                    pass
+                    print("Seems to have been logged out...")
+            print("Need new captcha...")
             self.preparar_receber_captcha()
 
     def active_loop(self):
@@ -372,7 +377,7 @@ class ESicLivre(object):
         new_pedidos = Pedido.get_new_pedidos()
         # Send new pedidos
         for pedido in new_pedidos:
-            print(pedido)
+            print('Sending pedido...')
             message = pedido.get_initial_message()
             protocolo, deadline = self.postar_pedido(pedido.orgao,
                                                      message.text)
@@ -381,9 +386,10 @@ class ESicLivre(object):
             pedido.initial_message_sent()
             message.sent = datetime.now()
             db.session.commit()
+            print('Sent!')
         # TODO: ver se quem quer recorrer
         # TODO: ver precisa olhar respostas aos pedidos
-        print("Feito")
+        print("Nothing more to do...")
 
     def update_orgaos_list(self):
         # Clear table
