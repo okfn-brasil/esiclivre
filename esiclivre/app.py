@@ -10,7 +10,6 @@ from flask.ext.restplus import apidoc
 
 from extensions import db, sv
 from views import api
-# from utils import active_loop
 from browser import ESicLivre
 
 
@@ -37,11 +36,7 @@ def create_app():
         pasta=app.config['DOWNLOADS_PATH'],
         app=app,
         )
-
-    # Avoids starting the browser when manager loads
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        # browser.start()
-        pass
+    app.browser = browser
 
     # API
     api.init_app(app)
