@@ -9,7 +9,6 @@ from flask.ext.script import Server, Manager, Shell
 from esiclivre.app import create_app, db, sv
 
 
-# manager = Manager(app)
 manager = Manager(create_app)
 
 # manager.add_command('run', Server(port=5004))
