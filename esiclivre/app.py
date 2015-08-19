@@ -24,7 +24,6 @@ def create_app():
     db.init_app(app)
 
     # Signer/Verifier
-    print(os.getcwd())
     sv.config(pub_key_path="settings/keypub")
 
     # Browser

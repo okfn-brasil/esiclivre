@@ -36,7 +36,7 @@ def run(browserless=False):
 
 @manager.command
 def initdb():
-    from models import Orgao
+    from esiclivre.models import Orgao
     db.drop_all()
     db.create_all()
 
