@@ -13,8 +13,6 @@ from esiclivre.app import create_app, db, sv
 manager = Manager(create_app)
 
 # manager.add_command('run', Server(port=5004))
-manager.add_option('-nb', '--no-browser', dest='no_browser',
-                   required=False, default=False)
 manager.add_command('shell', Shell(make_context=lambda: {
     'app': manager.app,
     'db': db,
