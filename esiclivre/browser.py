@@ -171,7 +171,9 @@ class ESicLivre(object):
 
         r = requests.get(link, stream=True, headers=headers)
         r.raw.decode_content = True
-        with open(os.path.join('static', 'captcha.jpg'), 'wb') as out_file:
+        import tempfile
+        # with open(os.path.join('static', 'captcha.jpg'), 'wb') as out_file:
+        with tempfile.NamedTemporaryFile() as out_file:
             shutil.copyfileobj(r.raw, out_file)
         # return requests.get(link, stream=True, headers=headers)
         # return requests.get(link, stream=True, headers=headers,
