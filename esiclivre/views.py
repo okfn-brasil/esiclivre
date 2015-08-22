@@ -6,7 +6,7 @@ from datetime import datetime
 from multiprocessing import Process
 
 from sqlalchemy.orm.exc import NoResultFound
-from flask.ext.restplus import Resource, Api, apidoc
+from flask.ext.restplus import Resource, Api
 
 from viralata.utils import decode_token
 
@@ -123,8 +123,31 @@ class GetPedidoId(Resource):
     def get(self, id_number):
         '''Returns a pedido by its id.'''
         try:
-            pedido = (db.session.query(Pedido)
-                      .filter_by(id=id_number).one())
+            pedido = db.session.query(Pedido).filter_by(id=id_number).one()
+        except NoResultFound:
+            api.abort(404)
+        return pedido_to_json(pedido)
+
+
+@api.route('/pedidos/keyword/<string:keyword_name>')
+class GetPedidoKeyword(Resource):
+
+    def get(self, keyword_name):
+        ''' Returns a pedido by its keyword name '''
+        try:
+            pedido = db.session.query(Pedido).filter_by(kw=keyword_name).one()
+        except NoResultFound:
+            api.abort(404)
+        return pedido_to_json(pedido)
+
+
+@api.route('/pedidos/orgao/<string:orgao>')
+class GetPedidoOrgao(Resource):
+
+    def get(self, orgao):
+
+        try:
+            pedido = db.session.query(Pedido).filter_by(orgao=orgao).one()
         except NoResultFound:
             api.abort(404)
         return pedido_to_json(pedido)
