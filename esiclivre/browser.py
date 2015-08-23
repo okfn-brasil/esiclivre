@@ -162,10 +162,10 @@ class ESicLivre(object):
             # Accept-Encoding: gzip, deflate
             # 'Referer': self.base_url + '/Account/Login.aspx',
             # 'Connection': keep-alive
-
             # 'Cookie': 'ASP.NET_SessionId=dgsonyd4zczcipg2vs3xgn0l'
-            'Cookie': '{0}={1}'.format(nome, cookie['value'])
         }
+        if cookie and cookie.get('value', False):
+            headers.update({'Cookie': '{0}={1}'.format(nome, cookie['value'])})
 
         r = requests.get(link, stream=True, headers=headers)
         r.raw.decode_content = True
