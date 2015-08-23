@@ -22,6 +22,7 @@ setup(
         'selenium',
         'requests',
         'speechrecognition',
+        'bleach'
         # psycopg2, # for Postgres support
     ],
     keywords=['esic', 'microservice'],

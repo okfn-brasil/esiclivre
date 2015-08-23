@@ -5,11 +5,11 @@ from __future__ import unicode_literals  # unicode by default
 from datetime import datetime
 from multiprocessing import Process
 
+import bleach
 from sqlalchemy.orm.exc import NoResultFound
 from flask.ext.restplus import Resource, Api
 
 from viralata.utils import decode_token
-
 from models import Orgao, Author, Pedido, Message, Keyword
 from extensions import db, sv
 
@@ -56,7 +56,8 @@ class NewPedido(Resource):
         author_name = decoded['username']
 
         # TODO: validar text (XSS)
-        text = args['text']
+        text = bleach.clean(args['text'], strip=True)
+
         # Size limit enforced by eSIC
         if len(text) > 6000:
             api.abort(400, "Text size limit exceeded")
