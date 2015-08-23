@@ -16,6 +16,7 @@ manager.add_command('shell', Shell(make_context=lambda: {
     'app': manager.app,
     'db': db,
     'sv': sv,
+    'browser': manager.app.browser
 }))
 
 
