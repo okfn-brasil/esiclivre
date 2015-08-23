@@ -42,6 +42,8 @@ class LoginNeeded(Exception):
 
 class ESicLivre(object):
 
+    _last_update_of_orgao_list = None
+
     def __init__(self, firefox=None, email=None, senha=None, pasta=None):
         """'firefox' é o caminho para o binário do Firefox a ser usado.
         'pasta' é o caminho para a pasta onde salvar os downloads."""
@@ -133,10 +135,6 @@ class ESicLivre(object):
         time.sleep(3)
         while self.nome_audio_captcha + ".part" in os.listdir(self.pasta):
             time.sleep(1)
-
-        # c = "ffmpeg -i {e} -ar 16000 {s} -y".format(e=cam_audio,
-        #                                             s=cam_audio[:-4] + "2.wav")
-        # os.system(c)
 
     def baixar_imagem_captcha(self):
         # Removes the last downloaded audio file, avoiding adding (1) to
@@ -359,6 +357,11 @@ class ESicLivre(object):
                     while self.safe_dict['running']:
                         # Keep alive; for how long? ...
                         if counter == 120:
+
+                            if self._last_update_of_orgao_list != datetime.today():
+                                print('Calling update_orgaos_list...')
+                                self.update_orgaos_list()
+
                             self.ir_para_registrar_pedido()
                             self.ir_para_consultar_pedido()
                             counter = 0
@@ -371,6 +374,7 @@ class ESicLivre(object):
 
                 except LoginNeeded:
                     print("Seems to have been logged out...")
+
             print("Need new captcha...")
             self.preparar_receber_captcha()
 
@@ -401,3 +405,9 @@ class ESicLivre(object):
             model_org = Orgao(name=org)
             db.session.add(model_org)
         db.session.commit()
+
+        self._last_update_of_orgao_list = datetime.today()
+
+        print("Last update of the 'orgaos' list: {}".format(
+            self._last_update_of_orgao_list
+        ))
