@@ -1,19 +1,37 @@
 import collections
+import logging
 
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 class Pedido(object):
 
-    def __init__(self, raw_data):
+    def __init__(self, raw_data, browser):
 
+        # Webdriver
+        self._browser = browser
+
+        # full page source
         self._raw_data = BeautifulSoup(raw_data)
+
+        # content of a 'pedido'
         self._main_data = self._raw_data.select('.pd_conteudo')[0]
+
+        # the general information about a 'pedido'
         self._details = self._main_data.select(
             '#ctl00_MainContent_dtv_pedido')[0]
+
+        # attachment (e.g. a detailed answer)
         self._attachemnt = self._main_data.select(
-            '#ctl00_MainContent_pnlAnexosResposta')[0]
+            '#ctl00_MainContent_grid_anexos_resposta')
+        self._attachemnt = self._attachemnt[0] if self._attachemnt else None
+
+        # the pedido's situation since the receivement until now
         self._situation = self._main_data.select('#fildSetSituacao')[0]
+
+        # all the answers and/or updates.
         self._history = self._main_data.select(
             '#ctl00_MainContent_grid_historico')[0]
 
@@ -55,12 +73,26 @@ class Pedido(object):
 
     @property
     def attachment(self):
-        data = self._attachemn.tbody.select('tr')[0]
-        if not data.text.split():
-            return 'Sem anexos.'
-        _, attachment = data.select('td')
-        return attachment.text
 
+        if self._attachemnt is None:
+            return 'Sem anexos.'
+
+        data = self._attachemnt.tbody.select('tr')[1:]
+        if not data or not any([i.text.split() for i in data]):
+            return 'Sem anexos.'
+
+        result = ()
+        for item in data:
+            filename, created_at, fileid = item.select('td')
+            attachment = collections.namedtuple(
+                'PedidoAttachment', ['filename', 'created_at', 'fileid'])
+
+            attachment.filename = filename.text
+            attachment.created_at = created_at.text
+            attachment.fileid = fileid.input.get('id')
+
+            result += (attachment,)
+        return result
 
     @property
     def situation(self):
@@ -68,35 +100,42 @@ class Pedido(object):
         _, situation = data.select('td')[:2]
         return situation.text
 
-
     @property
     def history(self):
 
         # get the 2th to skip header...
-        data = self._history.tbody.select('tr')[1]
+        data = self._history.tbody.select('tr')[1:]
 
-        _, situation, justification = data.select('td')[1:3]
-        date = data.span
+        result = ()
+        for item in data:
+            situation, justification, responsible = item.select('td')[1:]
+            date = item.span
 
-        history = collections.namedtuple('PedidoHistory', ['situation', 'justification', 'date'])
-        history.situation = situation.text
-        history.justification = justification.text
-        history.date = date.text
+            history = collections.namedtuple(
+                'PedidoHistory',
+                ['situation', 'justification', 'responsible', 'date']
+            )
+            history.situation = situation.text
+            history.justification = justification.text
+            history.responsible = responsible.text
+            history.date = date.text
 
-        return history
+            result += (history,)
+
+        return result
 
 
 class Pedidos(object):
+
+    _pedidos = []
+    _pedido_pagesource = []
 
     def __init__(self, browser):
 
         self._full_data = browser.navegador.find_element_by_id(
             'ctl00_MainContent_grid_pedido')
 
-        # total of 'pedidos'...
         total_of_pedidos = len(self._full_data.find_elements_by_tag_name('a'))
-
-        pre_pedidos = []
         for pos in range(total_of_pedidos):
 
             self._full_data = browser.navegador.find_element_by_id(
@@ -104,8 +143,11 @@ class Pedidos(object):
 
             self._full_data.find_elements_by_tag_name('a')[pos].click()
 
-            pre_pedidos.append(browser.navegador.page_source)
+            self._pedido_pagesource.append(browser.navegador.page_source)
 
             browser.ir_para_consultar_pedido()
 
-        self._pedidos = map(Pedido, pre_pedidos)
+    def get_pedidos(self, browser):
+
+        self._pedidos = [Pedido(pp, browser) for pp in self._pedido_pagesource]
+        return self._pedidos
