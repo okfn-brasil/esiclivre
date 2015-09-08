@@ -1,9 +1,75 @@
+# coding: utf-8
+
 import collections
 import logging
 
 from bs4 import BeautifulSoup
+import requests
 
 logger = logging.getLogger(__name__)
+
+
+class DynamicLink(object):
+
+    _request_headers = {
+        "Host": "esic.prefeitura.sp.gov.br",
+        "User-Agent": "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:28.0) Gecko/20100101  Firefox/28.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        "Referer": "http://esic.prefeitura.sp.gov.br/detalhes_pedido_v2.aspx",
+        "Connection": "keep-alive",
+        # "Content-Type": "application/x-www-form-urlencoded",
+        # "Content-Length": 8836,
+    }
+
+    def __init__(self, request_url, cookies):
+
+        self._request_url = request_url
+        self._request_headers.update({
+            "Referer": request_url,
+            "Cookie": self.get_parsed_cookies(cookies)
+        })
+
+    def get_parsed_cookies(self, cookies):
+        return u'{sessionid_key}={sessionid_value}; {aspxauth_key}={aspxauth_value}'.format(
+            sessionid_key=cookies[0]['name'],
+            sessionid_value=cookies[0]['value'],
+            aspxauth_key=cookies[1]['name'],
+            aspxauth_value=cookies[1]['value']
+        )
+
+
+class Attachment(DynamicLink):
+
+    def __init__(self, bsoup_form, bsoup_input, request_url, cookies):
+
+        self._bsoup_form = bsoup_form
+        self._bsoup_input = bsoup_input
+        super(Attachment, self).__init__(request_url, cookies)
+
+    def get_action(self):
+        return {self._bsoup_input.get('id'): self._bsoup_input.get('value')}
+
+    def get_params(self):
+
+        input_tags = filter(
+            lambda i: i.get('type') == 'hidden',
+            self._bsoup_form.select('input')
+        )
+
+        return {i.get('name'): i.get('value') for i in input_tags}
+
+
+    def get_attachment(self):
+
+        url = self._request_url
+        headers = self._request_headers
+        data = dict(
+            list(self.get_action().items()) + list(self.get_params().items())
+        )
+
+        return requests.post(url=url, headers=headers, data=data, stream=True)
 
 
 class Pedido(object):
