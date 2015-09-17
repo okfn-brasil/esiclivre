@@ -21,7 +21,8 @@ setup(
         'viralata',
         'selenium',
         'requests',
-        'speechrecognition',
+        'speechrecognition==2.2.0',
+        'beautifulsoup4',
         'bleach'
         # psycopg2, # for Postgres support
     ],

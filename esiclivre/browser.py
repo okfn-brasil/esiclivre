@@ -87,7 +87,8 @@ class ESicLivre(object):
         fp.set_preference("browser.download.folderList", 2)
         fp.set_preference("browser.download.manager.showWhenStarting", False)
         fp.set_preference("browser.download.dir", self.pasta)
-        tipos = "text/csv,audio/wav,audio/x-wav,image/jpeg"
+        tipos = ','.join(['text/csv', 'audio/wav', 'audio/x-wav',
+                          'image/jpeg', 'application/octet-stream'])
         fp.set_preference("browser.helperApps.neverAsk.saveToDisk", tipos)
         # fp.set_preference("plugin.disable_full_page_plugin_for_types",
         #                   "image/jpeg")
