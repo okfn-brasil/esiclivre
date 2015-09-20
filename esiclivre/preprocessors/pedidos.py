@@ -1,105 +1,33 @@
 # coding: utf-8
+from __future__ import print_function
 
 import collections
-import logging
+from pprint import pprint
+import time
 
 from bs4 import BeautifulSoup
-import requests
-
-logger = logging.getLogger(__name__)
-
-
-class DynamicLink(object):
-
-    _request_headers = {
-        "Host": "esic.prefeitura.sp.gov.br",
-        "User-Agent": "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:28.0) Gecko/20100101  Firefox/28.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate",
-        "Referer": "http://esic.prefeitura.sp.gov.br/detalhes_pedido_v2.aspx",
-        "Connection": "keep-alive",
-        # "Content-Type": "application/x-www-form-urlencoded",
-        # "Content-Length": 8836,
-    }
-
-    def __init__(self, request_url, cookies):
-
-        self._request_url = request_url
-        self._request_headers.update({
-            "Referer": request_url,
-            "Cookie": self.get_parsed_cookies(cookies)
-        })
-
-    def get_parsed_cookies(self, cookies):
-        return u'{sessionid_key}={sessionid_value}; {aspxauth_key}={aspxauth_value}'.format(
-            sessionid_key=cookies[0]['name'],
-            sessionid_value=cookies[0]['value'],
-            aspxauth_key=cookies[1]['name'],
-            aspxauth_value=cookies[1]['value']
-        )
-
-
-class Attachment(DynamicLink):
-
-    def __init__(self, bsoup_form, bsoup_input, request_url, cookies):
-
-        self._bsoup_form = bsoup_form
-        self._bsoup_input = bsoup_input
-        super(Attachment, self).__init__(request_url, cookies)
-
-    def get_action(self):
-        return {self._bsoup_input.get('id'): self._bsoup_input.get('value')}
-
-    def get_params(self):
-
-        input_tags = filter(
-            lambda i: i.get('type') == 'hidden',
-            self._bsoup_form.select('input')
-        )
-
-        return {i.get('name'): i.get('value') for i in input_tags}
-
-
-    def get_attachment(self):
-
-        url = self._request_url
-        headers = self._request_headers
-        data = dict(
-            list(self.get_action().items()) + list(self.get_params().items())
-        )
-
-        return requests.post(url=url, headers=headers, data=data, stream=True)
 
 
 class Pedido(object):
 
     def __init__(self, raw_data, browser):
 
-        # Webdriver
         self._browser = browser
+        self._raw_data = raw_data
+        self._main_data = self._get_main_data()
 
-        # full page source
-        self._raw_data = BeautifulSoup(raw_data)
+        if self._main_data:
 
-        # content of a 'pedido'
-        self._main_data = self._raw_data.select('.pd_conteudo')[0]
+            self._details = self._get_details()
+            self.attachemnts = self._get_attachments()
+            self.situation = self._get_situation()
+            self.history = self._get_history()
 
-        # the general information about a 'pedido'
-        self._details = self._main_data.select(
-            '#ctl00_MainContent_dtv_pedido')[0]
+    def _get_main_data(self):
+        return self._raw_data.form
 
-        # attachment (e.g. a detailed answer)
-        self._attachemnt = self._main_data.select(
-            '#ctl00_MainContent_grid_anexos_resposta')
-        self._attachemnt = self._attachemnt[0] if self._attachemnt else None
-
-        # the pedido's situation since the receivement until now
-        self._situation = self._main_data.select('#fildSetSituacao')[0]
-
-        # all the answers and/or updates.
-        self._history = self._main_data.select(
-            '#ctl00_MainContent_grid_historico')[0]
+    def _get_details(self):
+        return self._main_data.select('#ctl00_MainContent_dtv_pedido')[0]
 
     @property
     def protocol(self):
@@ -137,40 +65,43 @@ class Pedido(object):
         _, desc = data.select('td')
         return desc.text
 
-    @property
-    def attachment(self):
+    def _get_attachments(self):
 
-        if self._attachemnt is None:
-            return 'Sem anexos.'
+        grid = self._main_data.select('#ctl00_MainContent_grid_anexos_resposta')
+        if not grid:
+            return ()  # 'Sem anexos.'
+        else:
+            grid = grid[0]
 
-        data = self._attachemnt.tbody.select('tr')[1:]
+        data = grid.tbody.select('tr')[1:]
         if not data or not any([i.text.split() for i in data]):
-            return 'Sem anexos.'
+            return ()  # 'Sem anexos.'
 
         result = ()
         for item in data:
-            filename, created_at, fileid = item.select('td')
-            attachment = collections.namedtuple(
-                'PedidoAttachment', ['filename', 'created_at', 'fileid'])
 
+            filename, created_at, fileid = item.select('td')
+
+            attachment = collections.namedtuple(
+                'PedidoAttachment', ['filename', 'created_at'])
             attachment.filename = filename.text
             attachment.created_at = created_at.text
-            attachment.fileid = fileid.input.get('id')
 
             result += (attachment,)
         return result
 
-    @property
-    def situation(self):
-        data = self._situation.tbody.select('tr')[0]
+    def _get_situation(self):
+        fieldset =  self._main_data.select('#fildSetSituacao')[0]
+        data = fieldset.tbody.select('tr')[0]
         _, situation = data.select('td')[:2]
         return situation.text
 
-    @property
-    def history(self):
+    def _get_history(self):
+
+        grid =  self._main_data.select('#ctl00_MainContent_grid_historico')[0]
 
         # get the 2th to skip header...
-        data = self._history.tbody.select('tr')[1:]
+        data = grid.tbody.select('tr')[1:]
 
         result = ()
         for item in data:
@@ -198,22 +129,50 @@ class Pedidos(object):
 
     def __init__(self, browser):
 
+        self.set_full_data(browser)
+        self.get_all_pages_source(browser)
+        self.process_pedidos(browser)
+
+    def set_full_data(self, browser):
         self._full_data = browser.navegador.find_element_by_id(
             'ctl00_MainContent_grid_pedido')
+
+    def get_all_pages_source(self, browser):
 
         total_of_pedidos = len(self._full_data.find_elements_by_tag_name('a'))
         for pos in range(total_of_pedidos):
 
-            self._full_data = browser.navegador.find_element_by_id(
-                'ctl00_MainContent_grid_pedido')
-
+            self.set_full_data(browser)
             self._full_data.find_elements_by_tag_name('a')[pos].click()
 
-            self._pedido_pagesource.append(browser.navegador.page_source)
+            pagesource = BeautifulSoup(browser.navegador.page_source)
+            self._pedido_pagesource.append(pagesource)
 
-            browser.ir_para_consultar_pedido()
+            if not pagesource.select('#ctl00_MainContent_grid_anexos_resposta'):
+                browser.navegador.back()
+                continue
 
-    def get_pedidos(self, browser):
+            attachments = browser.navegador.find_element_by_id(
+                'ctl00_MainContent_grid_anexos_resposta'
+            )
+            for attachment in attachments.find_elements_by_tag_name('input'):
+                attachment.click()
+            browser.navegador.back()
 
-        self._pedidos = [Pedido(pp, browser) for pp in self._pedido_pagesource]
+
+    def process_pedidos(self, browser, page_source=None):
+
+        # Existe a possibilidade da pagina não retornar um codigo fonte valido
+        # a classe que estrutura o pedido retornará None se o código
+        # font não for valido...
+        if page_source:
+            pedido = Pedido(page_source, browser)
+            self._pedidos.append(pedido) if pedido else None
+        else:
+            self._pedidos = list(filter(
+                lambda p: p._main_data,
+                map(lambda pp: Pedido(pp, browser), self._pedido_pagesource)
+            ))
+
         return self._pedidos
+
