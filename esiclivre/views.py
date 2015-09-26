@@ -142,16 +142,20 @@ class GetPedidoId(Resource):
         return pedido_to_json(pedido)
 
 
-@api.route('/pedidos/keyword/<string:keyword_name>')
+@api.route('/keywords/<string:keyword_name>')
 class GetPedidoKeyword(Resource):
 
     def get(self, keyword_name):
-        ''' Returns a pedido by its keyword name '''
+        '''Returns pedidos marked with a specific keyword.'''
         try:
-            pedido = db.session.query(Pedido).filter_by(kw=keyword_name).one()
+            pedidos = (db.session.query(Pedido)
+                       .filter(Pedido.kw.contains(keyword_name)).all())
         except NoResultFound:
-            api.abort(404)
-        return pedido_to_json(pedido)
+            pedidos = []
+        return {
+            'keyword': keyword_name,
+            'pedidos': [pedido_to_json(pedido) for pedido in pedidos]
+        }
 
 
 @api.route('/pedidos/orgao/<string:orgao>')
@@ -166,26 +170,26 @@ class GetPedidoOrgao(Resource):
         return pedido_to_json(pedido)
 
 
-@api.route('/keywords/<string:keyword_name>')
-class GetKeyword(Resource):
+# @api.route('/keywords/<string:keyword_name>')
+# class GetKeyword(Resource):
 
-    def get(self, keyword_name):
-        '''Returns pedidos marked with a specific keyword.'''
-        try:
-            keyword = (db.session.query(Keyword)
-                       .filter_by(name=keyword_name).one())
-        except NoResultFound:
-            api.abort(404)
-        return {
-            'name': keyword.name,
-            'pedidos': [
-                {
-                    'id': pedido.id,
-                    'protoloco': pedido.protocolo,
-                }
-                for pedido in keyword.pedidos
-            ]
-        }
+#     def get(self, keyword_name):
+#         '''Returns pedidos marked with a specific keyword.'''
+#         try:
+#             keyword = (db.session.query(Keyword)
+#                        .filter_by(name=keyword_name).one())
+#         except NoResultFound:
+#             api.abort(404)
+#         return {
+#             'name': keyword.name,
+#             'pedidos': [
+#                 {
+#                     'id': pedido.id,
+#                     'protoloco': pedido.protocolo,
+#                 }
+#                 for pedido in keyword.pedidos
+#             ]
+#         }
 
 
 @api.route('/keywords')
@@ -257,10 +261,10 @@ def pedido_to_json(pedido):
         'id': pedido.id,
         'protocolo': pedido.protocolo,
         'orgao': pedido.orgao,
-        'autor': pedido.author.name,
+        'author': pedido.author.name,
         'state': pedido.get_state(),
         'deadline': format_date(pedido.deadline),
-        'keywords': pedido.kw,
+        # 'keywords': pedido.kw,
         'messages': [
             {
                 'text': m.text,
