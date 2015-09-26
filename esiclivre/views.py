@@ -7,17 +7,35 @@ from multiprocessing import Process
 
 import bleach
 from sqlalchemy.orm.exc import NoResultFound
-from flask.ext.restplus import Resource, Api
+from flask.ext.restplus import Resource
 
 from viralata.utils import decode_token
+from cutils import date_to_json, paginate, ExtraApi
+
 from models import Orgao, Author, Pedido, Message, Keyword
 from extensions import db, sv
 
 
-api = Api(version='1.0',
-          title='EsicLivre',
-          description='A microservice for eSIC interaction. All non-get '
-          'operations require a micro token.')
+api = ExtraApi(version='1.0',
+               title='EsicLivre',
+               description='A microservice for eSIC interaction. All non-get '
+               'operations require a micro token.')
+
+api.update_parser_arguments({
+    'text': {
+        'location': 'json',
+        'help': 'The text for the pedido.',
+    },
+    'orgao': {
+        'location': 'json',
+        'help': 'Orgao that should receive the pedido.',
+    },
+    'keywords': {
+        'location': 'json',
+        'type': list,
+        'help': 'Keywords to tag the pedido.',
+    },
+})
 
 
 @api.route('/orgaos')
@@ -40,27 +58,21 @@ class SetCaptcha(Resource):
         return {}
 
 
-@api.route('/pedidos/new')
-class NewPedido(Resource):
+@api.route('/pedidos')
+class PedidoApi(Resource):
 
-    parser = api.parser()
-    parser.add_argument('token', location='json')
-    parser.add_argument('text', location='json')
-    parser.add_argument('orgao', location='json')
-    parser.add_argument('keywords', location='json', type=list)
-
+    @api.doc(parser=api.create_parser('token', 'text', 'orgao', 'keywords'))
     def post(self):
         '''Adds a new pedido to be submited to eSIC.'''
-        args = self.parser.parse_args()
+        args = api.general_parse()
         decoded = decode_token(args['token'], sv, api)
         author_name = decoded['username']
 
-        # TODO: validar text (XSS)
         text = bleach.clean(args['text'], strip=True)
 
         # Size limit enforced by eSIC
         if len(text) > 6000:
-            api.abort(400, "Text size limit exceeded")
+            api.abort_with_msg(400, 'Text size limit exceeded.', ['text'])
 
         # Validate 'orgao'
         if args['orgao']:
@@ -68,9 +80,9 @@ class NewPedido(Resource):
                 orgao = (db.session.query(Orgao.name)
                          .filter_by(name=args['orgao']).one())
             except NoResultFound:
-                api.abort(400, "Orgao not found")
+                api.abort_with_msg(400, 'Orgao not found.', ['orgao'])
         else:
-            api.abort(400, "No Orgao specified")
+            api.abort_with_msg(400, 'No Orgao specified.', ['orgao'])
 
         # Get author (add if needed)
         try:
