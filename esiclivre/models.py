@@ -25,11 +25,12 @@ class Orgao(db.Model):
 class Pedido(db.Model):
     __tablename__ = 'pedido'
     id = db.Column(db.Integer, primary_key=True)
+
     # Using name as string and not ID for orgao table, because I think the
     # orgaos may change at any moment...
     orgao = db.Column(db.String(200), nullable=False)
-    author_id = db.Column(db.Integer, db.ForeignKey('author.id'),
-                          nullable=False)
+    author_id = db.Column(
+        db.Integer, db.ForeignKey('author.id'), nullable=False)
     messages = db.relationship("Message", backref="pedido")
     protocolo = db.Column(db.Integer, nullable=True)
     deadline = db.Column(db.DateTime, nullable=True, default=None)
@@ -81,7 +82,7 @@ class Message(db.Model):
     text = db.Column(db.Text, nullable=False)
     received = db.Column(db.DateTime, nullable=False)
     sent = db.Column(db.DateTime, nullable=True, default=None)
-    attachment = db.Column(db.LargeBinary, nullable=True, default=None)
+    attachment = db.Column(db.String(255), nullable=True, default='')
 
 
 class Author(db.Model):
