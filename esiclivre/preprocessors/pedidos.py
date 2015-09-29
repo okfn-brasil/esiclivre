@@ -7,6 +7,8 @@ import time
 
 from bs4 import BeautifulSoup
 
+from esiclivre import models
+
 
 class Pedido(object):
 
@@ -33,37 +35,37 @@ class Pedido(object):
     def protocol(self):
         data = self._details.tbody.select('tr')[0]
         _, protocolo = data.select('td')
-        return protocolo.text
+        return protocolo.text.strip()
 
     @property
     def interessado(self):
         data = self._details.tbody.select('tr')[1]
         _, interessado = data.select('td')
-        return interessado.text
+        return interessado.text.strip()
 
     @property
     def opened_at(self):
         data = self._details.tbody.select('tr')[2]
         _, opened_at = data.select('td')
-        return opened_at.text
+        return opened_at.text.strip()
 
     @property
     def orgao(self):
         data = self._details.tbody.select('tr')[3]
         _, orgao = data.select('td')
-        return orgao.text
+        return orgao.text.strip()
 
     @property
     def contact_option(self):
         data = self._details.tbody.select('tr')[4]
         _, option = data.select('td')
-        return option.text
+        return option.text.strip()
 
     @property
     def description(self):
         data = self._details.tbody.select('tr')[5]
         _, desc = data.select('td')
-        return desc.text
+        return desc.text.strip()
 
     def _get_attachments(self):
 
@@ -84,8 +86,10 @@ class Pedido(object):
 
             attachment = collections.namedtuple(
                 'PedidoAttachment', ['filename', 'created_at'])
-            attachment.filename = filename.text
-            attachment.created_at = created_at.text
+            attachment.filename = filename.text.strip().lower()
+            attachment.created_at = created_at.text.strip()
+
+            upload_attachment_to_internet_archive(attachment.filename)
 
             result += (attachment,)
         return result
@@ -94,7 +98,7 @@ class Pedido(object):
         fieldset =  self._main_data.select('#fildSetSituacao')[0]
         data = fieldset.tbody.select('tr')[0]
         _, situation = data.select('td')[:2]
-        return situation.text
+        return situation.text.strip()
 
     def _get_history(self):
 
@@ -112,12 +116,17 @@ class Pedido(object):
                 'PedidoHistory',
                 ['situation', 'justification', 'responsible', 'date']
             )
-            history.situation = situation.text
-            history.justification = justification.text
-            history.responsible = responsible.text
-            history.date = date.text
+            history.situation = situation.text.strip()
+            history.justification = justification.text.strip()
+            history.responsible = responsible.text.strip()
+            history.date = date.text.strip()
 
             result += (history,)
+
+        try:
+            result = sorted(result, key=lambda h: h.date)
+        except:
+            pass
 
         return result
 
@@ -152,6 +161,11 @@ class Pedidos(object):
                 browser.navegador.back()
                 continue
 
+            # a ideia era baixar os anexo apenas durante o processo de parsear
+            # o codigo fonte, mas ainda estou com dificuldades para fazer
+            # uma requisição valida para o servidor sem usar o selenium
+            # Em um proximo refactoring esse processo pode ser feito em
+            # durante o parsing do page source, background ou não.
             attachments = browser.navegador.find_element_by_id(
                 'ctl00_MainContent_grid_anexos_resposta'
             )
@@ -176,3 +190,59 @@ class Pedidos(object):
 
         return self._pedidos
 
+
+def save_pedido_into_db(pre_pedido):
+
+    # check if there is a object with the same protocol
+    pedido = models.Pedido.query.filter(
+        models.Pedido.protocolo == pre_pedido.protocol).first()
+    if not pedido:
+        pedido = models.Pedido()
+
+    # TODO: O que fazer se o orgão não existir no DB?
+    # por enquanto, nós vamos salvar o valor parseado
+    orgao = models.Orgao.query.filter(
+        models.Orgao.name == pre_pedido.orgao).first()
+    if not orgao:
+        orgao = pre_pedido.orgao
+    pedido.orgao = orgao
+
+    pedido.protocolo = int(pre_predido.protocol)
+    # TODO: Como preencher o autor_id?
+    # TODO: Como preencher o deadline?
+    # TODO: Como preencher o kw (keyword)?
+
+    # TODO: Confirmar se essa é a melhor maneira de tratar o estado
+    # do pedido.
+    pedido.state = 0 if pre_predido.situation == "recebido" else 1
+
+    # TODO: mover o processo do pedido para uma segunda função
+    # algo como: create_pedido_messages
+    # nesse processo é necessário considerar o histórico do pedido.
+
+    message = models.Message.query.filter(
+        models.Message.pedido_id == pedido.id).first()
+    if not message:
+        message = models.Message()
+
+    message.pedido_id = pedido.id
+    message.received = pedido.created_at
+    # TODO: Como preencher o sent?
+
+    message.attachment = ','.join([a.filename for a in pre_pedido.attachemnts])
+
+    pedido.messages = message
+
+    db.session.add(message)
+    db.session.add(pedido)
+    db.session.commit()
+
+
+def upload_attachment_to_internet_archive():
+    pass
+
+
+def update_pedidos_list(browser):
+    pedidos = Pedidos(browser)
+    for pedido in pedidos:
+        save_pedido_into_db(pedido)
