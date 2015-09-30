@@ -1,13 +1,19 @@
 # coding: utf-8
-from __future__ import print_function
-
 import collections
-from pprint import pprint
+import logging
+import os
+import string
 import time
 
-from bs4 import BeautifulSoup
+import bs4
+import flask
 
-from esiclivre import models
+from esiclivre import models, extensions
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+VALID_ATTACHMENTS_NAME_CHARS = string.lowercase + string.digits + '.-_'
 
 
 class Pedido(object):
@@ -69,7 +75,9 @@ class Pedido(object):
 
     def _get_attachments(self):
 
-        grid = self._main_data.select('#ctl00_MainContent_grid_anexos_resposta')
+        grid = self._main_data.select(
+            '#ctl00_MainContent_grid_anexos_resposta')
+
         if not grid:
             return ()  # 'Sem anexos.'
         else:
@@ -86,7 +94,7 @@ class Pedido(object):
 
             attachment = collections.namedtuple(
                 'PedidoAttachment', ['filename', 'created_at'])
-            attachment.filename = filename.text.strip().lower()
+            attachment.filename = clear_attachment_name(filename)
             attachment.created_at = created_at.text.strip()
 
             upload_attachment_to_internet_archive(attachment.filename)
@@ -95,14 +103,14 @@ class Pedido(object):
         return result
 
     def _get_situation(self):
-        fieldset =  self._main_data.select('#fildSetSituacao')[0]
+        fieldset = self._main_data.select('#fildSetSituacao')[0]
         data = fieldset.tbody.select('tr')[0]
         _, situation = data.select('td')[:2]
         return situation.text.strip()
 
     def _get_history(self):
 
-        grid =  self._main_data.select('#ctl00_MainContent_grid_historico')[0]
+        grid = self._main_data.select('#ctl00_MainContent_grid_historico')[0]
 
         # get the 2th to skip header...
         data = grid.tbody.select('tr')[1:]
@@ -136,12 +144,6 @@ class Pedidos(object):
     _pedidos = []
     _pedido_pagesource = []
 
-    def __init__(self, browser):
-
-        self.set_full_data(browser)
-        self.get_all_pages_source(browser)
-        self.process_pedidos(browser)
-
     def set_full_data(self, browser):
         self._full_data = browser.navegador.find_element_by_id(
             'ctl00_MainContent_grid_pedido')
@@ -154,24 +156,61 @@ class Pedidos(object):
             self.set_full_data(browser)
             self._full_data.find_elements_by_tag_name('a')[pos].click()
 
-            pagesource = BeautifulSoup(browser.navegador.page_source)
+            pagesource = bs4.BeautifulSoup(browser.navegador.page_source)
             self._pedido_pagesource.append(pagesource)
 
-            if not pagesource.select('#ctl00_MainContent_grid_anexos_resposta'):
+            if not pagesource.select('#ctl00_MainContent_grid_anexos_resposta'):  # noqa
                 browser.navegador.back()
                 continue
+            else:
+                # a ideia era baixar os anexo apenas durante o processo de
+                # parsear o codigo fonte, mas ainda estou com dificuldades
+                # para fazer uma requisição valida para o servidor sem usar o
+                # selenium. Em um proximo refactoring esse processo pode ser
+                # feito em durante o parsing do page source, background ou não.
+                attachments = browser.navegador.find_element_by_id(
+                    'ctl00_MainContent_grid_anexos_resposta'
+                )
+                if attachments:
+                    self.get_pedido_attachments(attachments)
 
-            # a ideia era baixar os anexo apenas durante o processo de parsear
-            # o codigo fonte, mas ainda estou com dificuldades para fazer
-            # uma requisição valida para o servidor sem usar o selenium
-            # Em um proximo refactoring esse processo pode ser feito em
-            # durante o parsing do page source, background ou não.
-            attachments = browser.navegador.find_element_by_id(
-                'ctl00_MainContent_grid_anexos_resposta'
-            )
-            for attachment in attachments.find_elements_by_tag_name('input'):
-                attachment.click()
             browser.navegador.back()
+        fix_attachment_name_and_extension()
+
+    def get_pedido_attachments(self, attachments):
+
+        for attachment in attachments.find_elements_by_tag_name('input'):
+
+            # baixar o arquivo
+            # TODO: Ignorar arquivos que já existem? Como lidar com a
+            # atualização de um anexo?
+            attachment.click()
+
+            # a ideia aqui é que se houver algum arquivo .part, ou seja, algum
+            # download ainda não terminou, o processo aguarde até esses
+            # arquivos serem baixados ou completar 300 tentativas (algo próximo
+            # a 5 minutos)
+            max_retries = 0
+            if '.part' in os.listdir(flask.current_app.config['DOWNLOADS_PATH']):  # noqa
+                logger.info("Existe algum download inacabado...")
+                while max_retries != 300:  # 5+ minutos
+
+                    download_dir = os.listdir(
+                        flask.current_app.config['DOWNLOADS_PATH']
+                    )
+
+                    uncomplete_download = next(
+                        (arq for arq in download_dir if arq.endswith('.part')),
+                        None
+                    )
+
+                    if not uncomplete_download:
+                        logger.info("Sem downloads inacabados...")
+                        break
+                    else:
+                        logger.info("Aguardar 1 segundo...")
+                        time.sleep(1)
+                        max_retries += 1
 
 
     def process_pedidos(self, browser, page_source=None):
@@ -190,6 +229,48 @@ class Pedidos(object):
 
         return self._pedidos
 
+    def get_pedido(self, attribute, value):
+
+        # obter o pedido atraves de um atributo
+        # e.g. get_pedido(protocol, 12345)
+        # pedido.protocol == 12345
+
+        pedido = next(
+            (p for p in self._pedidos if getattr(p, attribute, None) == value),
+            None
+        )
+
+        return pedido
+
+    def get_all_pedidos(self):
+        return self._pedidos
+
+
+def clear_attachment_name(name):
+
+    name = name.strip.lower()
+
+    return ''.join([l for l in name if l in VALID_ATTACHMENTS_NAME_CHARS])
+
+
+def fix_attachment_name_and_extension():
+    # remover caracter invalidos
+    # mudar extensão para lowercase
+    # apagar arquivos .part (nessa etapa, se um arquivo ainda é .part é porque
+    # o download falhou).
+    download_dir = flask.current_app.config['DOWNLOADS_PATH']
+    for _file in os.listdir(download_dir):
+
+        _file_fullpath = '{}/{}'.format(download_dir, _file)
+
+        if _file.endswith('.part'):
+            os.remove(_file_fullpath)
+        else:
+            os.rename(
+                _file_fullpath,
+                '{}/{}'.format(download_dir, clear_attachment_name(_file))
+            )
+
 
 def save_pedido_into_db(pre_pedido):
 
@@ -207,14 +288,14 @@ def save_pedido_into_db(pre_pedido):
         orgao = pre_pedido.orgao
     pedido.orgao = orgao
 
-    pedido.protocolo = int(pre_predido.protocol)
+    pedido.protocolo = int(pre_pedido.protocol)
     # TODO: Como preencher o autor_id?
     # TODO: Como preencher o deadline?
     # TODO: Como preencher o kw (keyword)?
 
     # TODO: Confirmar se essa é a melhor maneira de tratar o estado
     # do pedido.
-    pedido.state = 0 if pre_predido.situation == "recebido" else 1
+    pedido.state = 0 if pre_pedido.situation == "recebido" else 1
 
     # TODO: mover o processo do pedido para uma segunda função
     # algo como: create_pedido_messages
@@ -233,16 +314,35 @@ def save_pedido_into_db(pre_pedido):
 
     pedido.messages = message
 
-    db.session.add(message)
-    db.session.add(pedido)
-    db.session.commit()
+    extensions.db.session.add(message)
+    extensions.db.session.add(pedido)
+    extensions.db.session.commit()
 
 
-def upload_attachment_to_internet_archive():
-    pass
+def upload_attachment_to_internet_archive(filename):
+
+    download_dir = flask.current_app.config['DOWNLOADS_PATH']
+    downloaded_attachments = os.listdir(download_dir)
+
+    if not filename in [a for a in downloaded_attachments]:
+        logger.warning("Arquivo {!r} não existe!.".format(filename))
+        # TODO: O que fazer se o arquivo não estiver disponivel?
+        # Já temos um caso onde o download não completa, mas por falha no ser
+        # vidor do esic.
+    else:
+        logger.info("Enviar arquivo {!r} para o Internet Archive".format(filename))
+        pass  # TODO: implementar upload de arquivos para o IA
 
 
 def update_pedidos_list(browser):
-    pedidos = Pedidos(browser)
-    for pedido in pedidos:
+
+    # garantir que a tela inicial seja a de consulta de pedidos.
+    browser.ir_para_consultar_pedido()
+
+    pedidos = Pedidos()
+    pedidos.set_full_data(browser)
+    pedidos.get_all_pages_source(browser)
+    pedidos.process_pedidos(browser)
+
+    for pedido in pedidos.get_all_pedidos():
         save_pedido_into_db(pedido)
