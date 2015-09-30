@@ -16,6 +16,15 @@ pedido_keyword = db.Table(
 )
 
 
+class PedidosUpdate(db.Model):
+
+    __tablename__ = 'pedidos_update'
+    id = db.Column(db.Integer, primary_key=True)
+
+    last_update = db.Column(db.DateTime, nullable=False)
+    total_of_updated = db.Column(db.Integer, nullable=True, default=0)
+
+
 class Orgao(db.Model):
     __tablename__ = 'orgao'
     id = db.Column(db.Integer, primary_key=True)
