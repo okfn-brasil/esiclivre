@@ -222,7 +222,7 @@ class GetAuthor(Resource):
                     'protocolo': p.protocolo,
                     'orgao': p.orgao,
                     'state': p.get_state(),
-                    'deadline': format_date(p.deadline),
+                    'deadline': date_to_json(p.deadline),
                     'keywords': list(p.kw),
                 }
                 for p in author.pedidos
@@ -247,14 +247,6 @@ def set_captcha_func(value):
     api.browser.set_captcha(value)
 
 
-def format_date(date):
-    '''Helper to format dates.'''
-    if date:
-        return date.strftime("%d/%m/%Y")
-    else:
-        return None
-
-
 def pedido_to_json(pedido):
     '''Returns detailed information about a pedido.'''
     return {
@@ -263,14 +255,14 @@ def pedido_to_json(pedido):
         'orgao': pedido.orgao,
         'author': pedido.author.name,
         'state': pedido.get_state(),
-        'deadline': format_date(pedido.deadline),
+        'deadline': date_to_json(pedido.deadline),
         # 'keywords': pedido.kw,
         'messages': [
             {
                 'text': m.text,
                 'order': m.order,
-                'received': format_date(m.received),
-                'sent': format_date(m.sent),
+                'received': date_to_json(m.received),
+                'sent': date_to_json(m.sent),
                 # TODO: como colocar o anexo aqui? link para download?
             }
             # TODO: precisa dar sort?
