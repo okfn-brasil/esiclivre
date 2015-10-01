@@ -1,4 +1,5 @@
 # coding: utf-8
+from __future__ import print_function
 import collections
 import logging
 import os
@@ -6,7 +7,9 @@ import string
 import time
 
 import bs4
+import dateutil.parser
 import flask
+import internetarchive
 
 from esiclivre import models, extensions
 
@@ -29,6 +32,7 @@ class Pedido(object):
             self._details = self._get_details()
             self.attachemnts = self._get_attachments()
             self.situation = self._get_situation()
+            self.request_date = self._get_request_date()
             self.history = self._get_history()
 
     def _get_main_data(self):
@@ -49,11 +53,10 @@ class Pedido(object):
         _, interessado = data.select('td')
         return interessado.text.strip()
 
-    @property
-    def opened_at(self):
+    def _get_request_date(self):
         data = self._details.tbody.select('tr')[2]
         _, opened_at = data.select('td')
-        return opened_at.text.strip()
+        return dateutil.parser.parse(opened_at.text.strip(), dayfirst=True)
 
     @property
     def orgao(self):
@@ -94,11 +97,14 @@ class Pedido(object):
 
             attachment = collections.namedtuple(
                 'PedidoAttachment', ['filename', 'created_at'])
-            attachment.filename = clear_attachment_name(filename)
-            attachment.created_at = created_at.text.strip()
+            attachment.filename = clear_attachment_name(filename.text)
+            attachment.created_at = dateutil.parser.parse(
+                created_at.text.strip(), dayfirst=True)
 
             upload_attachment_to_internet_archive(attachment.filename)
 
+            print("anexo")
+            print(attachment.filename)
             result += (attachment,)
         return result
 
@@ -188,12 +194,12 @@ class Pedidos(object):
 
             # a ideia aqui é que se houver algum arquivo .part, ou seja, algum
             # download ainda não terminou, o processo aguarde até esses
-            # arquivos serem baixados ou completar 300 tentativas (algo próximo
-            # a 5 minutos)
+            # arquivos serem baixados ou completar N tentativas
+
             max_retries = 0
             if '.part' in os.listdir(flask.current_app.config['DOWNLOADS_PATH']):  # noqa
-                logger.info("Existe algum download inacabado...")
-                while max_retries != 300:  # 5+ minutos
+                print("Existe algum download inacabado...")
+                while max_retries != 10:
 
                     download_dir = os.listdir(
                         flask.current_app.config['DOWNLOADS_PATH']
@@ -205,13 +211,12 @@ class Pedidos(object):
                     )
 
                     if not uncomplete_download:
-                        logger.info("Sem downloads inacabados...")
+                        print("Sem downloads inacabados...")
                         break
                     else:
-                        logger.info("Aguardar 1 segundo...")
+                        print("Aguardar 1 segundo...")
                         time.sleep(1)
                         max_retries += 1
-
 
     def process_pedidos(self, browser, page_source=None):
 
@@ -248,7 +253,7 @@ class Pedidos(object):
 
 def clear_attachment_name(name):
 
-    name = name.strip.lower()
+    name = name.strip().lower()
 
     return ''.join([l for l in name if l in VALID_ATTACHMENTS_NAME_CHARS])
 
@@ -260,6 +265,8 @@ def fix_attachment_name_and_extension():
     # o download falhou).
     download_dir = flask.current_app.config['DOWNLOADS_PATH']
     for _file in os.listdir(download_dir):
+
+        print("file: {}".format(_file))
 
         _file_fullpath = '{}/{}'.format(download_dir, _file)
 
@@ -288,6 +295,10 @@ def save_pedido_into_db(pre_pedido):
         orgao = pre_pedido.orgao
     pedido.orgao = orgao
 
+    # TODO: Como lidar se o author_id for nulo?
+    if not pedido.author_id:
+        pedido.author_id = models.Author.query.first().id
+
     pedido.protocolo = int(pre_pedido.protocol)
     # TODO: Como preencher o autor_id?
     # TODO: Como preencher o deadline?
@@ -307,12 +318,20 @@ def save_pedido_into_db(pre_pedido):
         message = models.Message()
 
     message.pedido_id = pedido.id
-    message.received = pedido.created_at
+    message.received = pre_pedido.request_date
+    message.text = pre_pedido.description
+    # TODO: Uma maneira mais racional para definir a ordem da mensagem
+    # basicamente um historico com 1 item, contém apenas o item inicial
+    # e , sendo assim, é de ordem 0
+
+    order = len(pre_pedido.history)
+    message.order = 0 if order < 2 else order
+
     # TODO: Como preencher o sent?
 
     message.attachment = ','.join([a.filename for a in pre_pedido.attachemnts])
 
-    pedido.messages = message
+    pedido.messages.append(message)
 
     extensions.db.session.add(message)
     extensions.db.session.add(pedido)
@@ -324,14 +343,30 @@ def upload_attachment_to_internet_archive(filename):
     download_dir = flask.current_app.config['DOWNLOADS_PATH']
     downloaded_attachments = os.listdir(download_dir)
 
-    if not filename in [a for a in downloaded_attachments]:
-        logger.warning("Arquivo {!r} não existe!.".format(filename))
+    if filename not in [a for a in downloaded_attachments]:
+        print("Arquivo {!r} não existe!.".format(filename))
         # TODO: O que fazer se o arquivo não estiver disponivel?
         # Já temos um caso onde o download não completa, mas por falha no ser
         # vidor do esic.
     else:
-        logger.info("Enviar arquivo {!r} para o Internet Archive".format(filename))
-        pass  # TODO: implementar upload de arquivos para o IA
+
+        print("Enviar arquivo {!r} para o Internet Archive".format(filename))
+        # TODO: implementar upload de arquivos para o IA
+
+        acces_key = flask.current_app.config['IA_ACCESS_KEY']
+        secret_key = flask.current_app.config['IA_SECRET_KEY']
+
+        item = internetarchive.Item('arquivos_esic')
+        metada = dict(mediatype='pdf', creator='OKF')
+        result = item.upload(
+            '{}/{}'.format(download_dir, filename),
+            metadata=metadata,
+            acces_key=acces_key,
+            secret_key=secret_key
+        )
+        if not result:
+            print("Erro ao executar upload.")
+
 
 
 def update_pedidos_list(browser):
