@@ -6,6 +6,8 @@ from datetime import datetime
 from multiprocessing import Process
 
 import bleach
+from sqlalchemy import desc
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import NoResultFound
 from flask.ext.restplus import Resource
 
@@ -58,8 +60,51 @@ class SetCaptcha(Resource):
         return {}
 
 
+@api.route('/messages')
+class MessageApi(Resource):
+
+    @api.doc(parser=api.create_parser('page', 'per_page_num'))
+    def get(self):
+        '''List messages by decrescent time.'''
+        args = api.general_parse()
+        page = args['page']
+        per_page_num = args['per_page_num']
+        messages = (db.session.query(Pedido, Message)
+                    .options(joinedload('keywords'))
+                    .filter(Message.pedido_id == Pedido.id)
+                    .order_by(desc(Message.received)))
+                    # .distinct(Pedido.id))
+        # Limit que number of results per page
+        messages, total = paginate(messages, page, per_page_num)
+        return {
+            'messages': [
+                dict(msg_to_json(msg),
+                     keywords=[kw.name for kw in pedido.keywords])
+                for pedido, msg in messages
+            ],
+            'total': total,
+        }
+
+
 @api.route('/pedidos')
 class PedidoApi(Resource):
+
+    # @api.doc(parser=api.create_parser('page', 'per_page_num'))
+    # def get(self):
+    #     '''List pedidos by decrescent time.'''
+    #     args = api.general_parse()
+    #     page = args['page']
+    #     per_page_num = args['per_page_num']
+    #     pedidos = (db.session.query(Message, Pedido)
+    #                .filter(Message.pedido_id == Pedido.id)
+    #                .order_by(desc(Message.received)))
+    #                # .distinct(Message.pedido_id))
+    #     # Limit que number of results per page
+    #     pedidos, total = paginate(pedidos, page, per_page_num)
+    #     return {
+    #         'pedidos': [pedido_to_json(pedido) for m, pedido in pedidos],
+    #         'total': total,
+    #     }
 
     @api.doc(parser=api.create_parser('token', 'text', 'orgao', 'keywords'))
     def post(self):
@@ -249,6 +294,16 @@ def set_captcha_func(value):
     api.browser.set_captcha(value)
 
 
+def msg_to_json(msg):
+    return {
+        'text': msg.text,
+        'order': msg.order,
+        'received': date_to_json(msg.received),
+        'sent': date_to_json(msg.sent),
+        # TODO: como colocar o anexo aqui? link para download?
+    }
+
+
 def pedido_to_json(pedido):
     '''Returns detailed information about a pedido.'''
     return {
@@ -259,15 +314,6 @@ def pedido_to_json(pedido):
         'state': pedido.get_state(),
         'deadline': date_to_json(pedido.deadline),
         'keywords': [k.name for k in pedido.keywords],
-        'messages': [
-            {
-                'text': m.text,
-                'order': m.order,
-                'received': date_to_json(m.received),
-                'sent': date_to_json(m.sent),
-                # TODO: como colocar o anexo aqui? link para download?
-            }
-            # TODO: precisa dar sort?
-            for m in pedido.messages
-        ]
+        # TODO: precisa dar sort?
+        'messages': [msg_to_json(m) for m in pedido.messages]
     }
