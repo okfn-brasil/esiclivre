@@ -114,7 +114,7 @@ class PedidoApi(Resource):
                           order=0)
         db.session.add(message)
         db.session.commit()
-        return {}
+        return pedido_to_json(pedido)
 
 
 @api.route('/pedidos/protocolo/<int:protocolo>')
@@ -148,6 +148,9 @@ class GetPedidoKeyword(Resource):
     def get(self, keyword_name):
         '''Returns pedidos marked with a specific keyword.'''
         try:
+            # pedidos = (db.session.query(Keyword)
+            #            .filter_by(name=keyword_name).one()).pedidos
+            # print(pedidos)
             pedidos = (db.session.query(Pedido)
                        .filter(Pedido.kw.contains(keyword_name)).all())
         except NoResultFound:
@@ -162,7 +165,6 @@ class GetPedidoKeyword(Resource):
 class GetPedidoOrgao(Resource):
 
     def get(self, orgao):
-
         try:
             pedido = db.session.query(Pedido).filter_by(orgao=orgao).one()
         except NoResultFound:
@@ -256,7 +258,7 @@ def pedido_to_json(pedido):
         'author': pedido.author.name,
         'state': pedido.get_state(),
         'deadline': date_to_json(pedido.deadline),
-        # 'keywords': pedido.kw,
+        'keywords': [k.name for k in pedido.keywords],
         'messages': [
             {
                 'text': m.text,

@@ -106,7 +106,7 @@ class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False, unique=True)
     pedidos = db.relationship("Pedido",
-                              secondary=pedido_keyword,
+                              secondary=lambda: pedido_keyword,
                               backref="keywords")
 
     def __init__(self, name):
