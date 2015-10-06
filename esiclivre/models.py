@@ -3,6 +3,7 @@
 
 from __future__ import unicode_literals  # unicode by default
 
+from sqlalchemy_utils import ArrowType
 from sqlalchemy.ext.associationproxy import association_proxy
 
 from extensions import db
@@ -21,7 +22,7 @@ class PedidosUpdate(db.Model):
     __tablename__ = 'pedidos_update'
     id = db.Column(db.Integer, primary_key=True)
 
-    last_update = db.Column(db.DateTime, nullable=False)
+    last_update = db.Column(ArrowType, nullable=False)
     total_of_updated = db.Column(db.Integer, nullable=True, default=0)
 
 
@@ -42,7 +43,7 @@ class Pedido(db.Model):
         db.Integer, db.ForeignKey('author.id'), nullable=False)
     messages = db.relationship("Message", backref="pedido")
     protocolo = db.Column(db.Integer, nullable=True)
-    deadline = db.Column(db.DateTime, nullable=True, default=None)
+    deadline = db.Column(ArrowType, nullable=True, default=None)
     kw = association_proxy('keywords', 'name')
     # keywords = db.relationship("Keyword",
     #                           secondary=pedido_keyword,
@@ -89,8 +90,8 @@ class Message(db.Model):
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedido.id'),
                           nullable=False)
     text = db.Column(db.Text, nullable=False)
-    received = db.Column(db.DateTime, nullable=False)
-    sent = db.Column(db.DateTime, nullable=True, default=None)
+    received = db.Column(ArrowType, nullable=False)
+    sent = db.Column(ArrowType, nullable=True, default=None)
     attachment = db.Column(db.String(255), nullable=True, default='')
 
 
@@ -106,7 +107,7 @@ class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False, unique=True)
     pedidos = db.relationship("Pedido",
-                              secondary=pedido_keyword,
+                              secondary=lambda: pedido_keyword,
                               backref="keywords")
 
     def __init__(self, name):
