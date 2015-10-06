@@ -279,6 +279,10 @@ def fix_attachment_name_and_extension():
             )
 
 
+def create_pedido_messages(pedido):
+    pass
+
+
 def save_pedido_into_db(pre_pedido):
 
     # check if there is a object with the same protocol
@@ -308,10 +312,10 @@ def save_pedido_into_db(pre_pedido):
     # do pedido.
     pedido.state = 0 if pre_pedido.situation == "recebido" else 1
 
-    # TODO: mover o processo do pedido para uma segunda função
-    # algo como: create_pedido_messages
-    # nesse processo é necessário considerar o histórico do pedido.
+    pedido.messages = create_pedido_messages(pre_pedido)
 
+    """
+    for item in pre_pedido.history:
     message = models.Message.query.filter(
         models.Message.pedido_id == pedido.id).first()
     if not message:
@@ -320,6 +324,7 @@ def save_pedido_into_db(pre_pedido):
     message.pedido_id = pedido.id
     message.received = pre_pedido.request_date
     message.text = pre_pedido.description
+
     # TODO: Uma maneira mais racional para definir a ordem da mensagem
     # basicamente um historico com 1 item, contém apenas o item inicial
     # e , sendo assim, é de ordem 0
@@ -330,8 +335,7 @@ def save_pedido_into_db(pre_pedido):
     # TODO: Como preencher o sent?
 
     message.attachment = ','.join([a.filename for a in pre_pedido.attachemnts])
-
-    pedido.messages.append(message)
+    """
 
     extensions.db.session.add(message)
     extensions.db.session.add(pedido)
@@ -352,7 +356,7 @@ def upload_attachment_to_internet_archive(filename):
 
         print("Enviar arquivo {!r} para o Internet Archive".format(filename))
         # TODO: implementar upload de arquivos para o IA
-
+        """
         acces_key = flask.current_app.config['IA_ACCESS_KEY']
         secret_key = flask.current_app.config['IA_SECRET_KEY']
 
@@ -364,8 +368,10 @@ def upload_attachment_to_internet_archive(filename):
             acces_key=acces_key,
             secret_key=secret_key
         )
+
         if not result:
             print("Erro ao executar upload.")
+        """
 
 
 
