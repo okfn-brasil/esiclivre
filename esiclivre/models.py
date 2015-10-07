@@ -112,25 +112,3 @@ class Keyword(db.Model):
 
     def __init__(self, name):
         self.name = name
-
-    # def _find_or_create_tag(self, tag):
-    #     q = Keyword.query.filter_by(name=tag)
-    #     t = q.first()
-    #     if not(t):
-    #         t = Keyword(tag)
-    #     return t
-
-    # def _get_tags(self):
-    #     return [x.name for x in self.tags]
-
-    # def _set_tags(self, value):
-    #     # clear the list first
-    #     while self.tags:
-    #         del self.tags[0]
-    #     # add new tags
-    #     for tag in value:
-    #         self.tags.append(self._find_or_create_tag(tag))
-
-    # str_tags = property(_get_tags,
-    #                     _set_tags,
-    #                     "Property str_tags is a simple wrapper for tags relation")
