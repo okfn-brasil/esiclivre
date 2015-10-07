@@ -2,7 +2,6 @@
 # coding: utf-8
 
 from __future__ import unicode_literals  # unicode by default
-import os
 
 from flask import Flask, send_file, send_from_directory
 from flask.ext.cors import CORS

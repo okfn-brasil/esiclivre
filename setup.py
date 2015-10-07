@@ -21,8 +21,11 @@ setup(
         'viralata',
         'selenium',
         'requests',
-        'speechrecognition',
+        'speechrecognition==2.2.0',
+        'beautifulsoup4',
         'bleach'
+        'sqlalchemy-utils',
+        'arrow',
         # psycopg2, # for Postgres support
     ],
     keywords=['esic', 'microservice'],

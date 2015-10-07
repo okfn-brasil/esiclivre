@@ -6,18 +6,38 @@ from datetime import datetime
 from multiprocessing import Process
 
 import bleach
+from sqlalchemy import desc
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import NoResultFound
-from flask.ext.restplus import Resource, Api
+from flask.ext.restplus import Resource
 
 from viralata.utils import decode_token
+from cutils import date_to_json, paginate, ExtraApi
+
 from models import Orgao, Author, Pedido, Message, Keyword
 from extensions import db, sv
 
 
-api = Api(version='1.0',
-          title='EsicLivre',
-          description='A microservice for eSIC interaction. All non-get '
-          'operations require a micro token.')
+api = ExtraApi(version='1.0',
+               title='EsicLivre',
+               description='A microservice for eSIC interaction. All non-get '
+               'operations require a micro token.')
+
+api.update_parser_arguments({
+    'text': {
+        'location': 'json',
+        'help': 'The text for the pedido.',
+    },
+    'orgao': {
+        'location': 'json',
+        'help': 'Orgao that should receive the pedido.',
+    },
+    'keywords': {
+        'location': 'json',
+        'type': list,
+        'help': 'Keywords to tag the pedido.',
+    },
+})
 
 
 @api.route('/orgaos')
@@ -40,27 +60,64 @@ class SetCaptcha(Resource):
         return {}
 
 
-@api.route('/pedidos/new')
-class NewPedido(Resource):
+@api.route('/messages')
+class MessageApi(Resource):
 
-    parser = api.parser()
-    parser.add_argument('token', location='json')
-    parser.add_argument('text', location='json')
-    parser.add_argument('orgao', location='json')
-    parser.add_argument('keywords', location='json', type=list)
+    @api.doc(parser=api.create_parser('page', 'per_page_num'))
+    def get(self):
+        '''List messages by decrescent time.'''
+        args = api.general_parse()
+        page = args['page']
+        per_page_num = args['per_page_num']
+        messages = (db.session.query(Pedido, Message)
+                    .options(joinedload('keywords'))
+                    .filter(Message.pedido_id == Pedido.id)
+                    .order_by(desc(Message.received)))
+                    # .distinct(Pedido.id))
+        # Limit que number of results per page
+        messages, total = paginate(messages, page, per_page_num)
+        return {
+            'messages': [
+                dict(msg_to_json(msg),
+                     keywords=[kw.name for kw in pedido.keywords])
+                for pedido, msg in messages
+            ],
+            'total': total,
+        }
 
+
+@api.route('/pedidos')
+class PedidoApi(Resource):
+
+    # @api.doc(parser=api.create_parser('page', 'per_page_num'))
+    # def get(self):
+    #     '''List pedidos by decrescent time.'''
+    #     args = api.general_parse()
+    #     page = args['page']
+    #     per_page_num = args['per_page_num']
+    #     pedidos = (db.session.query(Message, Pedido)
+    #                .filter(Message.pedido_id == Pedido.id)
+    #                .order_by(desc(Message.received)))
+    #                # .distinct(Message.pedido_id))
+    #     # Limit que number of results per page
+    #     pedidos, total = paginate(pedidos, page, per_page_num)
+    #     return {
+    #         'pedidos': [pedido_to_json(pedido) for m, pedido in pedidos],
+    #         'total': total,
+    #     }
+
+    @api.doc(parser=api.create_parser('token', 'text', 'orgao', 'keywords'))
     def post(self):
         '''Adds a new pedido to be submited to eSIC.'''
-        args = self.parser.parse_args()
+        args = api.general_parse()
         decoded = decode_token(args['token'], sv, api)
         author_name = decoded['username']
 
-        # TODO: validar text (XSS)
         text = bleach.clean(args['text'], strip=True)
 
         # Size limit enforced by eSIC
         if len(text) > 6000:
-            api.abort(400, "Text size limit exceeded")
+            api.abort_with_msg(400, 'Text size limit exceeded.', ['text'])
 
         # Validate 'orgao'
         if args['orgao']:
@@ -68,9 +125,9 @@ class NewPedido(Resource):
                 orgao = (db.session.query(Orgao.name)
                          .filter_by(name=args['orgao']).one())
             except NoResultFound:
-                api.abort(400, "Orgao not found")
+                api.abort_with_msg(400, 'Orgao not found.', ['orgao'])
         else:
-            api.abort(400, "No Orgao specified")
+            api.abort_with_msg(400, 'No Orgao specified.', ['orgao'])
 
         # Get author (add if needed)
         try:
@@ -102,7 +159,7 @@ class NewPedido(Resource):
                           order=0)
         db.session.add(message)
         db.session.commit()
-        return {}
+        return pedido_to_json(pedido)
 
 
 @api.route('/pedidos/protocolo/<int:protocolo>')
@@ -130,23 +187,29 @@ class GetPedidoId(Resource):
         return pedido_to_json(pedido)
 
 
-@api.route('/pedidos/keyword/<string:keyword_name>')
+@api.route('/keywords/<string:keyword_name>')
 class GetPedidoKeyword(Resource):
 
     def get(self, keyword_name):
-        ''' Returns a pedido by its keyword name '''
+        '''Returns pedidos marked with a specific keyword.'''
         try:
-            pedido = db.session.query(Pedido).filter_by(kw=keyword_name).one()
+            # pedidos = (db.session.query(Keyword)
+            #            .filter_by(name=keyword_name).one()).pedidos
+            # print(pedidos)
+            pedidos = (db.session.query(Pedido)
+                       .filter(Pedido.kw.contains(keyword_name)).all())
         except NoResultFound:
-            api.abort(404)
-        return pedido_to_json(pedido)
+            pedidos = []
+        return {
+            'keyword': keyword_name,
+            'pedidos': [pedido_to_json(pedido) for pedido in pedidos]
+        }
 
 
 @api.route('/pedidos/orgao/<string:orgao>')
 class GetPedidoOrgao(Resource):
 
     def get(self, orgao):
-
         try:
             pedido = db.session.query(Pedido).filter_by(orgao=orgao).one()
         except NoResultFound:
@@ -154,26 +217,26 @@ class GetPedidoOrgao(Resource):
         return pedido_to_json(pedido)
 
 
-@api.route('/keywords/<string:keyword_name>')
-class GetKeyword(Resource):
+# @api.route('/keywords/<string:keyword_name>')
+# class GetKeyword(Resource):
 
-    def get(self, keyword_name):
-        '''Returns pedidos marked with a specific keyword.'''
-        try:
-            keyword = (db.session.query(Keyword)
-                       .filter_by(name=keyword_name).one())
-        except NoResultFound:
-            api.abort(404)
-        return {
-            'name': keyword.name,
-            'pedidos': [
-                {
-                    'id': pedido.id,
-                    'protoloco': pedido.protocolo,
-                }
-                for pedido in keyword.pedidos
-            ]
-        }
+#     def get(self, keyword_name):
+#         '''Returns pedidos marked with a specific keyword.'''
+#         try:
+#             keyword = (db.session.query(Keyword)
+#                        .filter_by(name=keyword_name).one())
+#         except NoResultFound:
+#             api.abort(404)
+#         return {
+#             'name': keyword.name,
+#             'pedidos': [
+#                 {
+#                     'id': pedido.id,
+#                     'protoloco': pedido.protocolo,
+#                 }
+#                 for pedido in keyword.pedidos
+#             ]
+#         }
 
 
 @api.route('/keywords')
@@ -206,7 +269,7 @@ class GetAuthor(Resource):
                     'protocolo': p.protocolo,
                     'orgao': p.orgao,
                     'state': p.get_state(),
-                    'deadline': format_date(p.deadline),
+                    'deadline': date_to_json(p.deadline),
                     'keywords': list(p.kw),
                 }
                 for p in author.pedidos
@@ -231,12 +294,14 @@ def set_captcha_func(value):
     api.browser.set_captcha(value)
 
 
-def format_date(date):
-    '''Helper to format dates.'''
-    if date:
-        return date.strftime("%d/%m/%Y")
-    else:
-        return None
+def msg_to_json(msg):
+    return {
+        'text': msg.text,
+        'order': msg.order,
+        'received': date_to_json(msg.received),
+        'sent': date_to_json(msg.sent),
+        # TODO: como colocar o anexo aqui? link para download?
+    }
 
 
 def pedido_to_json(pedido):
@@ -245,19 +310,10 @@ def pedido_to_json(pedido):
         'id': pedido.id,
         'protocolo': pedido.protocolo,
         'orgao': pedido.orgao,
-        'autor': pedido.author.name,
+        'author': pedido.author.name,
         'state': pedido.get_state(),
-        'deadline': format_date(pedido.deadline),
-        'keywords': pedido.kw,
-        'messages': [
-            {
-                'text': m.text,
-                'order': m.order,
-                'received': format_date(m.received),
-                'sent': format_date(m.sent),
-                # TODO: como colocar o anexo aqui? link para download?
-            }
-            # TODO: precisa dar sort?
-            for m in pedido.messages
-        ]
+        'deadline': date_to_json(pedido.deadline),
+        'keywords': [k.name for k in pedido.keywords],
+        # TODO: precisa dar sort?
+        'messages': [msg_to_json(m) for m in pedido.messages]
     }

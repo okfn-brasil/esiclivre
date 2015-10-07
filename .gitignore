@@ -69,3 +69,4 @@ compiled_templates
 captcha.jpg
 somCaptcha.wav
 .ropeproject
+prod_settings.py
