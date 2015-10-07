@@ -1,6 +1,7 @@
 # coding: utf-8
 from __future__ import print_function
 import collections
+import datetime
 import logging
 import os
 import string
@@ -312,32 +313,31 @@ def save_pedido_into_db(pre_pedido):
     # do pedido.
     pedido.state = 0 if pre_pedido.situation == "recebido" else 1
 
-    pedido.messages = create_pedido_messages(pre_pedido)
+    # pedido.messages = create_pedido_messages(pre_pedido)
 
-    """
     for item in pre_pedido.history:
-    message = models.Message.query.filter(
-        models.Message.pedido_id == pedido.id).first()
-    if not message:
-        message = models.Message()
 
-    message.pedido_id = pedido.id
-    message.received = pre_pedido.request_date
-    message.text = pre_pedido.description
+        message = models.Message.query.filter(
+            models.Message.pedido_id == pedido.id).first()
+        if not message:
+            message = models.Message()
 
-    # TODO: Uma maneira mais racional para definir a ordem da mensagem
-    # basicamente um historico com 1 item, contém apenas o item inicial
-    # e , sendo assim, é de ordem 0
+        message.pedido_id = pedido.id
+        message.received = item.date
+        message.text = item.justification
 
-    order = len(pre_pedido.history)
-    message.order = 0 if order < 2 else order
+        # TODO: Uma maneira mais racional para definir a ordem da mensagem
+        # basicamente um historico com 1 item, contém apenas o item inicial
+        # e , sendo assim, é de ordem 0
 
-    # TODO: Como preencher o sent?
+        order = len(pre_pedido.history)
+        message.order = 0 if order < 2 else order
 
-    message.attachment = ','.join([a.filename for a in pre_pedido.attachemnts])
-    """
+        # TODO: Como preencher o sent?
 
-    extensions.db.session.add(message)
+        pedido.messages.append(message)
+        extensions.db.session.add(message)
+
     extensions.db.session.add(pedido)
     extensions.db.session.commit()
 
@@ -354,25 +354,18 @@ def upload_attachment_to_internet_archive(filename):
         # vidor do esic.
     else:
 
-        print("Enviar arquivo {!r} para o Internet Archive".format(filename))
-        # TODO: implementar upload de arquivos para o IA
-        """
-        acces_key = flask.current_app.config['IA_ACCESS_KEY']
-        secret_key = flask.current_app.config['IA_SECRET_KEY']
-
         item = internetarchive.Item('arquivos_esic')
-        metada = dict(mediatype='pdf', creator='OKF')
+        metadata = dict(
+            mediatype='pdf',
+            creator='OKF',
+            created_at=datetime.datetime.utcnow().isoformat()
+        )
         result = item.upload(
-            '{}/{}'.format(download_dir, filename),
-            metadata=metadata,
-            acces_key=acces_key,
-            secret_key=secret_key
+            '{}/{}'.format(download_dir, filename), metadata=metadata
         )
 
         if not result:
             print("Erro ao executar upload.")
-        """
-
 
 
 def update_pedidos_list(browser):
