@@ -34,6 +34,7 @@ import speech_recognition as sr
 
 from extensions import db
 from models import Orgao, Pedido
+from preprocessors import pedidos as pedidos_preproc
 
 
 class LoginNeeded(Exception):
@@ -396,6 +397,20 @@ class ESicLivre(object):
             print('Sent!')
         # TODO: ver se quem quer recorrer
         # TODO: ver precisa olhar respostas aos pedidos
+
+        # Inicialmente, a atualização dos pedidos é feita uma vez ao dia
+        # TODO: Abrir uma issue para discutir melhor o processo de atualização
+        # de pedidos
+        had_update_today = models.PedidosUpdate.query.filter_by(
+            date=datetime.today()
+        ).count() > 0
+
+        if had_update_today:
+            print("Já houve atualização hoje!")
+            return None
+        else:
+            pedidos_preproc.update_pedidos_list(self.browser)
+
         print("Nothing more to do...")
 
     def update_orgaos_list(self):
