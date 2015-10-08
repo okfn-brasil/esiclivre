@@ -391,3 +391,11 @@ def update_pedidos_list(browser):
 
     for pedido in pedidos.get_all_pedidos():
         save_pedido_into_db(pedido)
+
+    # registrar atualização do dia
+    extensions.db.session.add(
+        models.PedidosUpdate(date=datetime.datetime.today())
+    )
+    extensions.db.session.commit()
+
+    print("Pedidos atualizados. Atualização registrada.")
