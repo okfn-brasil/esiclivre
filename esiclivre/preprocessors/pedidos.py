@@ -31,7 +31,7 @@ class Pedido(object):
         if self._main_data:
 
             self._details = self._get_details()
-            self.attachemnts = self._get_attachments()
+            self.attachments = self._get_attachments()
             self.situation = self._get_situation()
             self.request_date = self._get_request_date()
             self.history = self._get_history()
@@ -45,8 +45,8 @@ class Pedido(object):
     @property
     def protocol(self):
         data = self._details.tbody.select('tr')[0]
-        _, protocolo = data.select('td')
-        return protocolo.text.strip()
+        _, protocol = data.select('td')
+        return int(protocol.text.strip())
 
     @property
     def interessado(self):
@@ -102,7 +102,9 @@ class Pedido(object):
             attachment.created_at = dateutil.parser.parse(
                 created_at.text.strip(), dayfirst=True)
 
-            upload_attachment_to_internet_archive(attachment.filename)
+            upload_attachment_to_internet_archive(
+                self.protocol, attachment.filename
+            )
 
             print("anexo")
             print(attachment.filename)
@@ -280,69 +282,76 @@ def fix_attachment_name_and_extension():
             )
 
 
-def create_pedido_messages(pedido):
-    pass
+def create_pedido_messages(pre_pedido):
+
+    messages = []
+
+    for item in pre_pedido.history:
+
+        message = models.Message()
+        message.date = item.date
+        message.justification = item.justification
+        message.responsible = item.responsible
+        message.situation = item.situation
+
+        extensions.db.session.add(message)
+        messages.append(message)
+    extensions.db.session.commit() if messages else None
+
+    return messages
+
+
+def create_pedido_attachments(pre_pedido):
+
+    attachments = []
+    for item in pre_pedido.attachments:
+
+        attachment = models.Attachment()
+        attachment.created_at = item.created_at
+        attachment.name = item.filename
+
+        extensions.db.session.add(attachment)
+        attachments.append(attachment)
+    extensions.db.session.commit() if attachments else None
+
+    return attachments
 
 
 def save_pedido_into_db(pre_pedido):
 
     # check if there is a object with the same protocol
     pedido = models.Pedido.query.filter(
-        models.Pedido.protocolo == pre_pedido.protocol).first()
+        models.Pedido.protocol == pre_pedido.protocol).first()
     if not pedido:
-        pedido = models.Pedido()
+        pedido = models.Pedido(protocol=pre_pedido.protocol)
 
     # TODO: O que fazer se o orgão não existir no DB?
-    # por enquanto, nós vamos salvar o valor parseado
-    orgao = models.Orgao.query.filter(
-        models.Orgao.name == pre_pedido.orgao).first()
+    orgao = models.Orgao.query.filter_by(name=pre_pedido.orgao).first()
     if not orgao:
-        orgao = pre_pedido.orgao
+        orgao = models.Orgao(name=pre_pedido.orgao)
+        extensions.db.session.add(orgao)
+        extensions.db.session.commit()
+
     pedido.orgao = orgao
 
-    # TODO: Como lidar se o author_id for nulo?
-    if not pedido.author_id:
-        pedido.author_id = models.Author.query.first().id
+    if not pedido.author:
+        default_author = flask.current_app.config['DEFAULT_AUTHOR']
+        author = models.Author.query.filter_by(name=default_author).one()
+        pedido.author = author
 
-    pedido.protocolo = int(pre_pedido.protocol)
-    # TODO: Como preencher o autor_id?
     # TODO: Como preencher o deadline?
     # TODO: Como preencher o kw (keyword)?
 
-    # TODO: Confirmar se essa é a melhor maneira de tratar o estado
-    # do pedido.
-    pedido.state = 0 if pre_pedido.situation == "recebido" else 1
+    pedido.messages = create_pedido_messages(pre_pedido)
 
-    # pedido.messages = create_pedido_messages(pre_pedido)
-
-    for item in pre_pedido.history:
-
-        message = models.Message.query.filter(
-            models.Message.pedido_id == pedido.id).first()
-        if not message:
-            message = models.Message()
-
-        message.pedido_id = pedido.id
-        message.received = item.date
-        message.text = item.justification
-
-        # TODO: Uma maneira mais racional para definir a ordem da mensagem
-        # basicamente um historico com 1 item, contém apenas o item inicial
-        # e , sendo assim, é de ordem 0
-
-        order = len(pre_pedido.history)
-        message.order = 0 if order < 2 else order
-
-        # TODO: Como preencher o sent?
-
-        pedido.messages.append(message)
-        extensions.db.session.add(message)
+    if pre_pedido.attachments:
+        pedido.attachments = create_pedido_attachments(pre_pedido)
 
     extensions.db.session.add(pedido)
     extensions.db.session.commit()
 
 
-def upload_attachment_to_internet_archive(filename):
+def upload_attachment_to_internet_archive(pedido_protocol, filename):
 
     download_dir = flask.current_app.config['DOWNLOADS_PATH']
     downloaded_attachments = os.listdir(download_dir)
@@ -352,9 +361,10 @@ def upload_attachment_to_internet_archive(filename):
         # TODO: O que fazer se o arquivo não estiver disponivel?
         # Já temos um caso onde o download não completa, mas por falha no ser
         # vidor do esic.
+        return None
     else:
 
-        item = internetarchive.Item('arquivos_esic')
+        item = internetarchive.Item('pedido_{}'.format(pedido_protocol))
         metadata = dict(
             mediatype='pdf',
             creator='OKF',
@@ -364,7 +374,8 @@ def upload_attachment_to_internet_archive(filename):
             '{}/{}'.format(download_dir, filename), metadata=metadata
         )
 
-        if not result:
+        if not result or result[0].status_code != 200:
+            # TODO: O que fazer nessa situação?
             print("Erro ao executar upload.")
 
 
