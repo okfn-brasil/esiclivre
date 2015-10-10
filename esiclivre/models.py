@@ -148,7 +148,7 @@ class Pedido(db.Model):
     )
 
     keywords = db.relationship(
-        'Keyword', secondary=pedido_keyword, backref='pedido'
+        'Keyword', secondary=pedido_keyword, backref='pedidos'
     )
 
     attachments = db.relationship(
