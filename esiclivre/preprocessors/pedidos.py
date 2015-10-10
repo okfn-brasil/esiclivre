@@ -11,6 +11,7 @@ import bs4
 import dateutil.parser
 import flask
 import internetarchive
+from sqlalchemy.orm.exc import NoResultFound
 
 from esiclivre import models, extensions
 
@@ -29,7 +30,6 @@ class Pedido(object):
         self._main_data = self._get_main_data()
 
         if self._main_data:
-
             self._details = self._get_details()
             self.attachments = self._get_attachments()
             self.situation = self._get_situation()
@@ -78,7 +78,6 @@ class Pedido(object):
         return desc.text.strip()
 
     def _get_attachments(self):
-
         grid = self._main_data.select(
             '#ctl00_MainContent_grid_anexos_resposta')
 
@@ -320,32 +319,47 @@ def create_pedido_attachments(pre_pedido):
 
 
 def save_pedido_into_db(pre_pedido):
-
     # check if there is a object with the same protocol
     pedido = models.Pedido.query.filter(
         models.Pedido.protocol == pre_pedido.protocol).first()
     if not pedido:
-        pedido = models.Pedido(protocol=pre_pedido.protocol)
+        default_author = flask.current_app.config['DEFAULT_AUTHOR']
+
+        try:
+            author = (extensions.db.session.query(models.Author)
+                      .filter_by(name=default_author).one())
+        except NoResultFound:
+            author = models.Author(name=default_author)
+            extensions.db.session.add(author)
+            extensions.db.session.commit()
+
+        pedido = models.Pedido(protocol=pre_pedido.protocol,
+                               author=author)
+        pedido.add_keyword('recuperado')
 
     # TODO: O que fazer se o orgão não existir no DB?
-    orgao = models.Orgao.query.filter_by(name=pre_pedido.orgao).first()
+    if not pre_pedido.orgao:
+        orgao_name = 'desconhecido'
+    else:
+        orgao_name = pre_pedido.orgao
+    orgao = models.Orgao.query.filter_by(name=orgao_name).first()
     if not orgao:
-        orgao = models.Orgao(name=pre_pedido.orgao)
+        orgao = models.Orgao(name=orgao_name)
         extensions.db.session.add(orgao)
         extensions.db.session.commit()
+    pedido.orgao = orgao
+    # if pre_pedido.orgao:
+    #     pedido.orgao = pre_pedido.orgao
+    # else:
+    #     pedido.orgao = 'desconhecido'
+    #     print('Aviso: orgao sendo marcado como desconhecido. Protolo: ' +
+    #           str(pre_pedido.protocolo))
 
     pedido.interessado = pre_pedido.interessado
     pedido.situation = pre_pedido.situation
     pedido.request_date = pre_pedido.request_date
     pedido.contact_option = pre_pedido.contact_option
     pedido.description = pre_pedido.description
-
-    pedido.orgao = orgao
-
-    if not pedido.author:
-        default_author = flask.current_app.config['DEFAULT_AUTHOR']
-        author = models.Author.query.filter_by(name=default_author).one()
-        pedido.author = author
 
     # TODO: Como preencher o deadline?
     # TODO: Como preencher o kw (keyword)?
