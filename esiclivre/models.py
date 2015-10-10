@@ -155,6 +155,16 @@ class Pedido(db.Model):
         'Attachment', secondary=pedido_attachments, backref='pedido'
     )
 
+    def add_keyword(self, keyword_name):
+        try:
+            keyword = (db.session.query(Keyword)
+                       .filter_by(name=keyword_name).one())
+        except NoResultFound:
+            keyword = Keyword(name=keyword_name)
+            db.session.add(keyword)
+            db.session.commit()
+        self.keywords.append(keyword)
+
 
 class Orgao(db.Model):
 
@@ -163,16 +173,6 @@ class Orgao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(255), nullable=False, unique=True)
-
-    def add_keyword(self, keyword_name):
-        try:
-            keyword = (db.session.query(Keyword)
-                       .filter_by(name=keyword_name).one())
-        except NoResultFound:
-            keyword = Keyword(keyword_name)
-            db.session.add(keyword)
-            db.session.commit()
-        self.keywords.append(keyword)
 
 
 class Message(db.Model):
