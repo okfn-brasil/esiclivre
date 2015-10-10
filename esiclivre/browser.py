@@ -382,17 +382,14 @@ class ESicLivre(object):
 
     def active_loop(self):
         """Does routine stuff inside eSIC, like posting pedidos."""
-        new_pedidos = Pedido.get_new_pedidos()
+        pending_pre_pedidos = PrePedido.get_all_pending()
         # Send new pedidos
-        for pedido in new_pedidos:
-            print('Sending pedido...')
-            message = pedido.get_initial_message()
-            protocolo, deadline = self.postar_pedido(pedido.orgao,
-                                                     message.text)
-            pedido.protocolo = int(protocolo)
-            pedido.deadline = deadline
-            pedido.initial_message_sent()
-            message.sent = datetime.now()
+        for pre_pedido in pending_pre_pedidos:
+
+            protocolo, deadline = self.postar_pedido(
+                pre_pedido.orgao, pre_pedido.text
+            )
+            pre_pedido.create_pedido(protocolo, deadline)
             db.session.commit()
             print('Sent!')
         # TODO: ver se quem quer recorrer
