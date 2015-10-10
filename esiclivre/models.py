@@ -1,81 +1,168 @@
-#!/usr/bin/env python
 # coding: utf-8
 
 from __future__ import unicode_literals  # unicode by default
 
-from sqlalchemy_utils import ArrowType
-from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm.exc import NoResultFound
+
+import datetime
+
+import sqlalchemy as sa
+import sqlalchemy_utils as sa_utils
+
 
 from extensions import db
 
 
-pedido_keyword = db.Table(
-    'pedido_keyword',
-    db.metadata,
+pedido_orgao = sa.Table(
+    'pedido_orgao', db.metadata,
+    db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
+    db.Column('orgao_id', db.Integer, db.ForeignKey('orgao.id'))
+)
+
+pedido_attachments = sa.Table(
+    'pedido_attachments', db.metadata,
+    db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
+    db.Column('attachment_id', db.Integer, db.ForeignKey('attachment.id'))
+)
+
+pedido_messages = sa.Table(
+    'pedido_messages', db.metadata,
+    db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
+    db.Column('message_id', db.Integer, db.ForeignKey('message.id'))
+)
+
+pedido_keyword = sa.Table(
+    'pedido_keyword', db.metadata,
     db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
     db.Column('keyword_id', db.Integer, db.ForeignKey('keyword.id'))
+)
+
+pedido_author = sa.Table(
+    'pedido_author', db.metadata,
+    db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
+    db.Column('author_id', db.Integer, db.ForeignKey('author.id'))
 )
 
 
 class PedidosUpdate(db.Model):
 
     __tablename__ = 'pedidos_update'
+
     id = db.Column(db.Integer, primary_key=True)
 
-    last_update = db.Column(ArrowType, nullable=False)
-    total_of_updated = db.Column(db.Integer, nullable=True, default=0)
+    date = db.Column(sa_utils.ArrowType, index=True)
 
 
-class Orgao(db.Model):
-    __tablename__ = 'orgao'
+class PrePedido(db.Model):
+
+    __tablename__ = 'pre_pedido'
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
+
+    author_id = db.Column(db.Integer)
+
+    orgao_name = db.Column(db.String(255))
+
+    text = db.Column(sa.UnicodeText())
+
+    keywords = db.Column(db.String(255))  # separated by commas
+
+    state = db.Column(db.String(255))  # WAITING or PROCESSED
+
+    created_at = db.Column(sa_utils.ArrowType)
+
+    updated_at = db.Column(sa_utils.ArrowType)
+
+    @classmethod
+    def get_all_pending(self):
+        return self.query.filter_by(state='WAITING')
+
+    @property
+    def orgao(self):
+        return Orgao.query.filter_by(name=self.orgao_name).one()
+
+    @property
+    def author(self):
+        return Author.query.filter_by(id=self.author_id).one()
+
+    @property
+    def all_keywords(self):
+        return [
+            Keyword.query.filter_by(name=k).one() for k in self.keywords.split(',')  #noqa
+        ]
+
+    def create_pedido(self, protocolo, deadline):
+
+        pedido = Pedido()
+
+        pedido.protocol = protocolo
+        pedido.deadline = deadline
+
+        pedido.orgao = self.orgao
+        pedido.author = self.author
+        pedido.keywords = self.all_keywords
+
+        pedido.description = self.text
+        pedido.request_date = datetime.datetime.today()
+
+        db.session.add(pedido)
+        db.session.commit()
+
+        self.updated_at = datetime.datetime.today()
+        self.state = 'PROCESSED'
+
+        db.session.add(self)
+        db.session.commit()
 
 
 class Pedido(db.Model):
+
     __tablename__ = 'pedido'
+
     id = db.Column(db.Integer, primary_key=True)
 
-    # Using name as string and not ID for orgao table, because I think the
-    # orgaos may change at any moment...
-    orgao = db.Column(db.String(200), nullable=False)
-    author_id = db.Column(
-        db.Integer, db.ForeignKey('author.id'), nullable=False)
-    messages = db.relationship("Message", backref="pedido")
-    protocolo = db.Column(db.Integer, nullable=True)
-    deadline = db.Column(ArrowType, nullable=True, default=None)
-    kw = association_proxy('keywords', 'name')
-    # keywords = db.relationship("Keyword",
-    #                           secondary=pedido_keyword,
-    #                           backref="pedidos")
+    protocol = db.Column(db.Integer, index=True, unique=True)
 
-    # State of this pedido
-    # 0 - created, but not sent
-    # 1 - sent, waiting reply from orgao
-    state = db.Column(db.Integer, nullable=False, default=0)
+    interessado = db.Column(db.String(255))
 
-    @classmethod
-    def get_new_pedidos(cls):
-        return (db.session.query(cls).filter(cls.state == 0).all())
+    situation = db.Column(db.String(255), index=True)
 
-    def get_initial_message(self):
-        # TODO: otimizar isso para carregar as msgs junto com o load do pedido?
-        for message in self.messages:
-            if message.order == 0:
-                return message
-        return None
+    request_date = db.Column(sa_utils.ArrowType, index=True)
 
-    def initial_message_sent(self):
-        self.state = 1
+    contact_option = db.Column(db.String(255), nullable=True)
 
-    def get_state(self):
-        if self.state == 0:
-            return "Waiting to be send"
-        elif self.state == 1:
-            return "Waiting reply"
+    description = db.Column(sa.UnicodeText())
 
-        return "Unknown"
+    deadline = db.Column(sa_utils.ArrowType, index=True)
+
+    orgao = db.relationship(
+        'Orgao', secondary=pedido_orgao, backref='pedido', uselist=False
+    )
+
+    history = db.relationship(
+        'Message', secondary=pedido_messages, backref='pedido'
+    )
+
+    author = db.relationship(
+        'Author', secondary=pedido_author, backref='pedidos', uselist=False
+    )
+
+    keywords = db.relationship(
+        'Keyword', secondary=pedido_keyword, backref='pedido'
+    )
+
+    attachments = db.relationship(
+        'Attachment', secondary=pedido_attachments, backref='pedido'
+    )
+
+
+class Orgao(db.Model):
+
+    __tablename__ = 'orgao'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    name = db.Column(db.String(255), nullable=False, unique=True)
 
     def add_keyword(self, keyword_name):
         try:
@@ -89,37 +176,46 @@ class Pedido(db.Model):
 
 
 class Message(db.Model):
+
     __tablename__ = 'message'
+
     id = db.Column(db.Integer, primary_key=True)
-    # Number of this message inside a pedido
-    # 0 - the pedido itself (from user to orgao)
-    # 1 - the first reply (from orgao to user)
-    # 2 - the first appeal (from user to orgao)
-    # 3 - the second reply (from orgao to user)
-    # ...
-    order = db.Column(db.Integer, nullable=False)
-    pedido_id = db.Column(db.Integer, db.ForeignKey('pedido.id'),
-                          nullable=False)
-    text = db.Column(db.Text, nullable=False)
-    received = db.Column(ArrowType, nullable=False)
-    sent = db.Column(ArrowType, nullable=True, default=None)
-    attachment = db.Column(db.String(255), nullable=True, default='')
+
+    situation = db.Column(db.String(255))
+
+    justification = db.Column(sa.UnicodeText())
+
+    responsible = db.Column(db.String(255))
+
+    date = db.Column(sa_utils.ArrowType, index=True)
 
 
 class Author(db.Model):
+
     __tablename__ = 'author'
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False, unique=True)
-    pedidos = db.relationship("Pedido", backref="author")
+
+    name = db.Column(db.String(255), nullable=False, unique=True)
 
 
 class Keyword(db.Model):
-    __tablename__ = 'keyword'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False, unique=True)
-    pedidos = db.relationship("Pedido",
-                              secondary=lambda: pedido_keyword,
-                              backref="keywords")
 
-    def __init__(self, name):
-        self.name = name
+    __tablename__ = 'keyword'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    name = db.Column(db.String(255), nullable=False, unique=True, index=True)
+
+
+class Attachment(db.Model):
+
+    __tablename__ = 'attachment'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    name = db.Column(db.String(255), nullable=False)
+
+    created_at = db.Column(sa_utils.ArrowType)
+
+    ia_url = db.Column(sa_utils.URLType)

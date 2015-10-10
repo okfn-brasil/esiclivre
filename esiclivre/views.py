@@ -14,7 +14,7 @@ from flask.ext.restplus import Resource
 from viralata.utils import decode_token
 from cutils import date_to_json, paginate, ExtraApi
 
-from models import Orgao, Author, Pedido, Message, Keyword
+from models import Orgao, Author, PrePedido, Pedido, Message, Keyword
 from extensions import db, sv
 
 
@@ -73,7 +73,6 @@ class MessageApi(Resource):
                     .options(joinedload('keywords'))
                     .filter(Message.pedido_id == Pedido.id)
                     .order_by(desc(Message.received)))
-                    # .distinct(Pedido.id))
         # Limit que number of results per page
         messages, total = paginate(messages, page, per_page_num)
         return {
@@ -121,38 +120,45 @@ class PedidoApi(Resource):
 
         # Validate 'orgao'
         if args['orgao']:
-            try:
-                orgao = (db.session.query(Orgao.name)
-                         .filter_by(name=args['orgao']).one())
-            except NoResultFound:
+            orgao_exists = db.session.query.filter_by(
+                name=args['orgao']).count() == 1
+            if not orgao_exists:
                 api.abort_with_msg(400, 'Orgao not found.', ['orgao'])
         else:
             api.abort_with_msg(400, 'No Orgao specified.', ['orgao'])
 
         # Get author (add if needed)
         try:
-            author_id = (db.session.query(Author.id)
-                         .filter_by(name=author_name).one())
+            author_id = db.session.query(
+                Author.id).filter_by(name=author_name).one()
         except NoResultFound:
             author = Author(name=author_name)
             db.session.add(author)
             db.session.commit()
             author_id = author.id
 
-        now = datetime.now()
-        pedido = Pedido(author_id=author_id, orgao=orgao)
+        pre_pedido = PrePedido(author_id=author_id, orgao_name=args['orgao'])
 
         # Set keywords
         for keyword_name in args['keywords']:
-            pedido.add_keyword(keyword_name)
+            # pedido.add_keyword(keyword_name)
+            try:
+                keyword = (db.session.query(Keyword)
+                           .filter_by(name=keyword_name).one())
+            except NoResultFound:
+                keyword = Keyword(keyword_name)
+                db.session.add(keyword)
+                db.session.commit()
+        pre_pedido.keywords = ','.join(k for k in args['keywords'])
+        pre_pedido.text = text
+        pre_pedido.state = 'WAITING'
+        pre_pedido.created_at = datetime.utcnow()
 
-        db.session.add(pedido)
+        db.session.add(pre_pedido)
         db.session.commit()
-        message = Message(pedido_id=pedido.id, received=now, text=text,
-                          order=0)
-        db.session.add(message)
-        db.session.commit()
-        return pedido_to_json(pedido)
+        # TODO: o que retornar aqui?
+        # return pedido_to_json(pedido)
+        return {'status': 'ok'}
 
 
 @api.route('/pedidos/protocolo/<int:protocolo>')

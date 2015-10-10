@@ -34,6 +34,7 @@ import speech_recognition as sr
 
 from extensions import db
 from models import Orgao, Pedido
+from preprocessors import pedidos as pedidos_preproc
 
 
 class LoginNeeded(Exception):
@@ -381,21 +382,32 @@ class ESicLivre(object):
 
     def active_loop(self):
         """Does routine stuff inside eSIC, like posting pedidos."""
-        new_pedidos = Pedido.get_new_pedidos()
+        pending_pre_pedidos = PrePedido.get_all_pending()
         # Send new pedidos
-        for pedido in new_pedidos:
-            print('Sending pedido...')
-            message = pedido.get_initial_message()
-            protocolo, deadline = self.postar_pedido(pedido.orgao,
-                                                     message.text)
-            pedido.protocolo = int(protocolo)
-            pedido.deadline = deadline
-            pedido.initial_message_sent()
-            message.sent = datetime.now()
+        for pre_pedido in pending_pre_pedidos:
+
+            protocolo, deadline = self.postar_pedido(
+                pre_pedido.orgao, pre_pedido.text
+            )
+            pre_pedido.create_pedido(protocolo, deadline)
             db.session.commit()
             print('Sent!')
         # TODO: ver se quem quer recorrer
         # TODO: ver precisa olhar respostas aos pedidos
+
+        # Inicialmente, a atualização dos pedidos é feita uma vez ao dia
+        # TODO: Abrir uma issue para discutir melhor o processo de atualização
+        # de pedidos
+        had_update_today = models.PedidosUpdate.query.filter_by(
+            date=datetime.today()
+        ).count() > 0
+
+        if had_update_today:
+            print("Já houve atualização hoje!")
+            return None
+        else:
+            pedidos_preproc.update_pedidos_list(self.browser)
+
         print("Nothing more to do...")
 
     def update_orgaos_list(self):
