@@ -332,6 +332,12 @@ def save_pedido_into_db(pre_pedido):
         extensions.db.session.add(orgao)
         extensions.db.session.commit()
 
+    pedido.interessado = pre_pedido.interessado
+    pedido.situation = pre_pedido.situation
+    pedido.request_date = pre_pedido.request_date
+    pedido.contact_option = pre_pedido.contact_option
+    pedido.description = pre_pedido.description
+
     pedido.orgao = orgao
 
     if not pedido.author:
