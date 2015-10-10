@@ -193,11 +193,11 @@ class GetPedidoKeyword(Resource):
     def get(self, keyword_name):
         '''Returns pedidos marked with a specific keyword.'''
         try:
-            # pedidos = (db.session.query(Keyword)
-            #            .filter_by(name=keyword_name).one()).pedidos
-            # print(pedidos)
-            pedidos = (db.session.query(Pedido)
-                       .filter(Pedido.kw.contains(keyword_name)).all())
+            pedidos = (db.session.query(Keyword)
+                       .options(joinedload('pedidos'))
+                       .filter_by(name=keyword_name).one()).pedidos
+            # pedidos = (db.session.query(Pedido)
+            #            .filter(Pedido.kw.contains(keyword_name)).all())
         except NoResultFound:
             pedidos = []
         return {
@@ -258,6 +258,7 @@ class GetAuthor(Resource):
         '''Returns pedidos marked with a specific keyword.'''
         try:
             author = (db.session.query(Author)
+                      .options(joinedload('pedidos'))
                       .filter_by(name=name).one())
         except NoResultFound:
             api.abort(404)
@@ -270,7 +271,7 @@ class GetAuthor(Resource):
                     'orgao': p.orgao,
                     'state': p.get_state(),
                     'deadline': date_to_json(p.deadline),
-                    'keywords': list(p.kw),
+                    'keywords': [kw.name for kw in p.keywords],
                 }
                 for p in author.pedidos
             ]
