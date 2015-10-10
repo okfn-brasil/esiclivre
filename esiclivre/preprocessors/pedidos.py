@@ -1,12 +1,13 @@
 # coding: utf-8
 from __future__ import print_function
+
 import collections
-import datetime
 import logging
 import os
 import string
 import time
 
+import arrow
 import bs4
 import dateutil.parser
 import flask
@@ -20,7 +21,7 @@ logger.setLevel(logging.INFO)
 VALID_ATTACHMENTS_NAME_CHARS = string.lowercase + string.digits + '.-_'
 
 
-class Pedido(object):
+class ParsedPedido(object):
 
     def __init__(self, raw_data, browser):
 
@@ -150,7 +151,7 @@ class Pedido(object):
 
 class Pedidos(object):
 
-    _pedidos = []
+    _parsedpedidos = []
     _pedido_pagesource = []
 
     def set_full_data(self, browser):
@@ -227,31 +228,18 @@ class Pedidos(object):
         # a classe que estrutura o pedido retornará None se o código
         # font não for valido...
         if page_source:
-            pedido = Pedido(page_source, browser)
-            self._pedidos.append(pedido) if pedido else None
+            pedido = ParsedPedido(page_source, browser)
+            self._parsedpedidos.append(pedido) if pedido else None
         else:
-            self._pedidos = list(filter(
-                lambda p: p._main_data,
-                map(lambda pp: Pedido(pp, browser), self._pedido_pagesource)
-            ))
+            self._parsedpedidos = list(p for p in (
+                ParsedPedido(pp, browser) for pp in self._pedido_pagesource
+                ) if p._main_data
+            )
 
-        return self._pedidos
+        return self._parsedpedidos
 
-    def get_pedido(self, attribute, value):
-
-        # obter o pedido atraves de um atributo
-        # e.g. get_pedido(protocol, 12345)
-        # pedido.protocol == 12345
-
-        pedido = next(
-            (p for p in self._pedidos if getattr(p, attribute, None) == value),
-            None
-        )
-
-        return pedido
-
-    def get_all_pedidos(self):
-        return self._pedidos
+    def get_all_parsed_pedidos(self):
+        return self._parsedpedidos
 
 
 def clear_attachment_name(name):
@@ -374,7 +362,7 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
         metadata = dict(
             mediatype='pdf',
             creator='OKF',
-            created_at=datetime.datetime.utcnow().isoformat()
+            created_at=arrow.now().isoformat()
         )
         result = item.upload(
             '{}/{}'.format(download_dir, filename), metadata=metadata
@@ -395,12 +383,12 @@ def update_pedidos_list(browser):
     pedidos.get_all_pages_source(browser)
     pedidos.process_pedidos(browser)
 
-    for pedido in pedidos.get_all_pedidos():
+    for pedido in pedidos.get_all_parsed_pedidos():
         save_pedido_into_db(pedido)
 
     # registrar atualização do dia
     extensions.db.session.add(
-        models.PedidosUpdate(date=datetime.datetime.today())
+        models.PedidosUpdate(date=arrow.now())
     )
     extensions.db.session.commit()
 
