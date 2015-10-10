@@ -142,6 +142,7 @@ class PedidoApi(Resource):
 
         # Set keywords
         for keyword_name in args['keywords']:
+            # pedido.add_keyword(keyword_name)
             try:
                 keyword = (db.session.query(Keyword)
                            .filter_by(name=keyword_name).one())

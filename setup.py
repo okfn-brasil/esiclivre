@@ -23,9 +23,10 @@ setup(
         'requests',
         'speechrecognition==2.2.0',
         'beautifulsoup4',
-        'bleach'
+        'bleach',
         'sqlalchemy-utils',
         'arrow',
+        'internetarchive',
         # psycopg2, # for Postgres support
     ],
     keywords=['esic', 'microservice'],

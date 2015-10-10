@@ -166,7 +166,9 @@ class Pedidos(object):
             self.set_full_data(browser)
             self._full_data.find_elements_by_tag_name('a')[pos].click()
 
-            pagesource = bs4.BeautifulSoup(browser.navegador.page_source)
+            pagesource = bs4.BeautifulSoup(browser.navegador.page_source,
+                                           "html5lib")
+
             self._pedido_pagesource.append(pagesource)
 
             if not pagesource.select('#ctl00_MainContent_grid_anexos_resposta'):  # noqa
@@ -224,9 +226,9 @@ class Pedidos(object):
 
     def process_pedidos(self, browser, page_source=None):
 
-        # Existe a possibilidade da pagina não retornar um codigo fonte valido
+        # Existe a possibilidade da pagina não retornar um codigo fonte válido
         # a classe que estrutura o pedido retornará None se o código
-        # font não for valido...
+        # fonte não for válido...
         if page_source:
             pedido = ParsedPedido(page_source, browser)
             self._parsedpedidos.append(pedido) if pedido else None
@@ -353,8 +355,8 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
     if filename not in [a for a in downloaded_attachments]:
         print("Arquivo {!r} não existe!.".format(filename))
         # TODO: O que fazer se o arquivo não estiver disponivel?
-        # Já temos um caso onde o download não completa, mas por falha no ser
-        # vidor do esic.
+        # Já temos um caso onde o download não completa, mas por falha no
+        # servidor do esic.
         return None
     else:
 

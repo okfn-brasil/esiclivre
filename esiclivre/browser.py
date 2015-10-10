@@ -33,7 +33,7 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 import speech_recognition as sr
 
 from extensions import db
-from models import Orgao, Pedido
+from models import Orgao, PrePedido, PedidosUpdate
 from preprocessors import pedidos as pedidos_preproc
 
 
@@ -236,7 +236,6 @@ class ESicLivre(object):
         # Enviar pedido de informação
         self.navegador.find_element_by_id(
             "ctl00_MainContent_btnEnviarAntes").click()
-        pass
 
     def check_login_needed(self):
         if self.esta_em_login():
@@ -398,7 +397,7 @@ class ESicLivre(object):
         # Inicialmente, a atualização dos pedidos é feita uma vez ao dia
         # TODO: Abrir uma issue para discutir melhor o processo de atualização
         # de pedidos
-        had_update_today = models.PedidosUpdate.query.filter_by(
+        had_update_today = PedidosUpdate.query.filter_by(
             date=datetime.today()
         ).count() > 0
 
