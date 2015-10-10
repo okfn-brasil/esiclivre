@@ -2,9 +2,10 @@
 # coding: utf-8
 
 from __future__ import unicode_literals  # unicode by default
-from datetime import datetime
+
 from multiprocessing import Process
 
+import arrow
 import bleach
 from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
@@ -151,7 +152,7 @@ class PedidoApi(Resource):
         pre_pedido.keywords = ','.join(k for k in args['keywords'])
         pre_pedido.text = text
         pre_pedido.state = 'WAITING'
-        pre_pedido.created_at = datetime.utcnow()
+        pre_pedido.created_at = arrow.now()
 
         db.session.add(pre_pedido)
         db.session.commit()
