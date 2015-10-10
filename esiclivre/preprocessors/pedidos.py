@@ -373,6 +373,8 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
         if not result or result[0].status_code != 200:
             # TODO: O que fazer nessa situação?
             print("Erro ao executar upload.")
+        else:
+            os.remove('{}/{}'.format(download_dir, filename))
 
 
 def update_pedidos_list(browser):
