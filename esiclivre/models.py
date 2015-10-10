@@ -5,6 +5,7 @@ from __future__ import unicode_literals  # unicode by default
 
 from sqlalchemy_utils import ArrowType
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.orm.exc import NoResultFound
 
 from extensions import db
 
@@ -75,6 +76,16 @@ class Pedido(db.Model):
             return "Waiting reply"
 
         return "Unknown"
+
+    def add_keyword(self, keyword_name):
+        try:
+            keyword = (db.session.query(Keyword)
+                       .filter_by(name=keyword_name).one())
+        except NoResultFound:
+            keyword = Keyword(keyword_name)
+            db.session.add(keyword)
+            db.session.commit()
+        self.keywords.append(keyword)
 
 
 class Message(db.Model):
