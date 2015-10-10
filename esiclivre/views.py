@@ -144,14 +144,7 @@ class PedidoApi(Resource):
 
         # Set keywords
         for keyword_name in args['keywords']:
-            try:
-                keyword = (db.session.query(Keyword)
-                           .filter_by(name=keyword_name).one())
-            except NoResultFound:
-                keyword = Keyword(keyword_name)
-                db.session.add(keyword)
-                db.session.commit()
-            pedido.keywords.append(keyword)
+            pedido.add_keyword(keyword_name)
 
         db.session.add(pedido)
         db.session.commit()
