@@ -85,7 +85,8 @@ class PrePedido(db.Model):
     @property
     def all_keywords(self):
         return [
-            Keyword.query.filter_by(name=k).one() for k in self.keywords.split(',')  #noqa
+            Keyword.query.filter_by(name=k).one()
+            for k in self.keywords.split(',')  # noqa
         ]
 
     def create_pedido(self, protocolo, deadline):
