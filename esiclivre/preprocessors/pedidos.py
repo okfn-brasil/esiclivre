@@ -271,23 +271,21 @@ def fix_attachment_name_and_extension():
             )
 
 
-def create_pedido_messages(pre_pedido):
-
-    messages = []
+def add_pedido_messages(pre_pedido, pedido):
 
     for item in pre_pedido.history:
-
+        print(item.date)
         message = models.Message()
         message.date = item.date
         message.justification = item.justification
         message.responsible = item.responsible
         message.situation = item.situation
+        message.pedido_id = pedido.id
 
         extensions.db.session.add(message)
-        messages.append(message)
-    extensions.db.session.commit() if messages else None
 
-    return messages
+    if pre_pedido.history:
+        extensions.db.session.commit()
 
 
 def create_pedido_attachments(pre_pedido):
@@ -352,13 +350,13 @@ def save_pedido_into_db(pre_pedido):
     # TODO: Como preencher o deadline?
     # TODO: Como preencher o kw (keyword)?
 
-    pedido.messages = create_pedido_messages(pre_pedido)
+    extensions.db.session.add(pedido)
+    extensions.db.session.commit()
+
+    add_pedido_messages(pre_pedido, pedido)
 
     if pre_pedido.attachments:
         pedido.attachments = create_pedido_attachments(pre_pedido)
-
-    extensions.db.session.add(pedido)
-    extensions.db.session.commit()
 
 
 def upload_attachment_to_internet_archive(pedido_protocol, filename):
