@@ -9,7 +9,7 @@ import time
 
 import arrow
 import bs4
-# import dateutil.parser
+import dateutil.parser
 import flask
 import internetarchive
 from sqlalchemy.orm import joinedload
@@ -21,6 +21,10 @@ from esiclivre import models, extensions
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 VALID_ATTACHMENTS_NAME_CHARS = string.lowercase + string.digits + '.-_'
+
+
+def parse_date(text):
+    return arrow.get(dateutil.parser.parse(text, dayfirst=True))
 
 
 class ParsedPedido(object):
@@ -60,7 +64,7 @@ class ParsedPedido(object):
         data = self._details.tbody.select('tr')[2]
         _, opened_at = data.select('td')
         # return dateutil.parser.parse(opened_at.text.strip(), dayfirst=True)
-        return arrow.get(opened_at.text.strip(), ['DD/MM/YYYY'])
+        return parse_date(opened_at.text.strip())
 
     @property
     def orgao(self):
@@ -103,8 +107,7 @@ class ParsedPedido(object):
             attachment.filename = clear_attachment_name(filename.text)
             # attachment.created_at = dateutil.parser.parse(
             #     created_at.text.strip(), dayfirst=True)
-            attachment.created_at = arrow.get(
-                created_at.text.strip(), ['DD/MM/YYYY'])
+            attachment.created_at = parse_date(created_at.text.strip())
 
             upload_attachment_to_internet_archive(
                 self.protocol, attachment.filename
@@ -140,7 +143,7 @@ class ParsedPedido(object):
             history.situation = situation.text.strip()
             history.justification = justification.text.strip()
             history.responsible = responsible.text.strip()
-            history.date = arrow.get(date.text.strip(), ['DD/MM/YYYY'])
+            history.date = parse_date(date.text.strip())
 
             result += (history,)
 
