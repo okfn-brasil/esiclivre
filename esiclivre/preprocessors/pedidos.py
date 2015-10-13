@@ -275,21 +275,30 @@ def fix_attachment_name_and_extension():
             )
 
 
-def add_pedido_messages(pre_pedido, pedido):
-
+def update_pedido_messages(pre_pedido, pedido):
+    '''Update messages for a pedido. Messages with same date and justification
+    are considered equal.'''
+    new_insetion = False
     for item in pre_pedido.history:
-        print(item.date)
-        message = models.Message()
-        message.date = item.date
-        message.justification = item.justification
-        message.responsible = item.responsible
-        message.situation = item.situation
-        message.pedido_id = pedido.id
+        # Check if is a new msg
+        already_inserted = False
+        for itemDB in pedido.history:
+            if (item.date == itemDB.date and
+               item.justification == itemDB.justification):
+                already_inserted = True
 
-        extensions.db.session.add(message)
+        # Insert if is a new msg
+        if not already_inserted:
+            message = models.Message()
+            message.date = item.date
+            message.justification = item.justification
+            message.responsible = item.responsible
+            message.situation = item.situation
+            message.pedido_id = pedido.id
+            extensions.db.session.add(message)
+            new_insetion = True
 
-    if pre_pedido.history:
-        extensions.db.session.commit()
+    extensions.db.session.commit() if new_insetion else None
 
 
 def create_pedido_attachments(pre_pedido):
@@ -310,11 +319,13 @@ def create_pedido_attachments(pre_pedido):
 
 def save_pedido_into_db(pre_pedido):
     # check if there is a object with the same protocol
-    pedido = models.Pedido.query.filter(
-        models.Pedido.protocol == pre_pedido.protocol).first()
+    pedido = (models.Pedido.query.filter(
+        models.Pedido.protocol == pre_pedido.protocol)
+        .options(joinedload('history'))
+        .first())
     if not pedido:
+        # if not, create one
         default_author = flask.current_app.config['DEFAULT_AUTHOR']
-
         try:
             author = (extensions.db.session.query(models.Author)
                       .filter_by(name=default_author).one())
@@ -326,6 +337,7 @@ def save_pedido_into_db(pre_pedido):
         pedido = models.Pedido(protocol=pre_pedido.protocol,
                                author=author)
         pedido.add_keyword('recuperado')
+        extensions.db.session.add(pedido)
 
     # TODO: O que fazer se o orgão não existir no DB?
     if not pre_pedido.orgao:
@@ -354,10 +366,9 @@ def save_pedido_into_db(pre_pedido):
     # TODO: Como preencher o deadline?
     # TODO: Como preencher o kw (keyword)?
 
-    extensions.db.session.add(pedido)
     extensions.db.session.commit()
 
-    add_pedido_messages(pre_pedido, pedido)
+    update_pedido_messages(pre_pedido, pedido)
 
     if pre_pedido.attachments:
         pedido.attachments = create_pedido_attachments(pre_pedido)
