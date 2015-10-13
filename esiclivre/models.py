@@ -2,13 +2,10 @@
 
 from __future__ import unicode_literals  # unicode by default
 
-from sqlalchemy.orm.exc import NoResultFound
-
-import datetime
-
+import arrow
 import sqlalchemy as sa
 import sqlalchemy_utils as sa_utils
-
+from sqlalchemy.orm.exc import NoResultFound
 
 from extensions import db
 
@@ -103,12 +100,14 @@ class PrePedido(db.Model):
         pedido.keywords = self.all_keywords
 
         pedido.description = self.text
-        pedido.request_date = datetime.datetime.today()
+        # pedido.request_date = datetime.datetime.today()
+        pedido.request_date = arrow.utcnow()
 
         db.session.add(pedido)
         db.session.commit()
 
-        self.updated_at = datetime.datetime.today()
+        # self.updated_at = datetime.datetime.today()
+        self.updated_at = arrow.utcnow()
         self.state = 'PROCESSED'
 
         db.session.add(self)
