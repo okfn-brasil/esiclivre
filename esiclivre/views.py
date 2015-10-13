@@ -170,7 +170,8 @@ class GetPedidoProtocolo(Resource):
         try:
             pedido = (db.session.query(Pedido)
                       .options(joinedload('history'))
-                      .order_by('history.date')
+                      .options(joinedload('keywords'))
+                      # .order_by('Message.date')
                       .filter_by(protocol=protocolo).one())
         except NoResultFound:
             api.abort(404)
@@ -317,6 +318,6 @@ def pedido_to_json(pedido):
         'situacao': pedido.situation,
         'deadline': date_to_json(pedido.deadline),
         'keywords': [k.name for k in pedido.keywords],
-        # TODO: precisa dar sort?
-        'messages': [msg_to_json(m) for m in pedido.history]
+        'messages': [msg_to_json(m)
+                     for m in sorted(pedido.history, key=lambda m: m.date)],
     }
