@@ -198,6 +198,7 @@ class GetPedidoKeyword(Resource):
         try:
             pedidos = (db.session.query(Keyword)
                        .options(joinedload('pedidos'))
+                       .options(joinedload('pedidos.history'))
                        .filter_by(name=keyword_name).one()).pedidos
             # pedidos = (db.session.query(Pedido)
             #            .filter(Pedido.kw.contains(keyword_name)).all())
@@ -205,7 +206,15 @@ class GetPedidoKeyword(Resource):
             pedidos = []
         return {
             'keyword': keyword_name,
-            'pedidos': [pedido_to_json(pedido) for pedido in pedidos]
+            # 'pedidos': [pedido_to_json(pedido) for pedido in pedidos],
+            # 'pedidos': sorted([pedido_to_json(pedido)
+            #                    for pedido in pedidos],
+            #                   key=lambda p: p['messages'][0]['received'],
+            #                   reverse=True)
+            'pedidos': [pedido_to_json(pedido)
+                        for pedido in sorted(pedidos,
+                        key=lambda p: p.request_date,
+                        reverse=True)],
         }
 
 
@@ -301,6 +310,8 @@ def set_captcha_func(value):
 def msg_to_json(msg):
     return {
         'text': msg.justification,
+        'situacao': msg.situation,
+        'responsavel': msg.responsible,
         # 'order': msg.order,
         'received': date_to_json(msg.date),
         # 'sent': date_to_json(msg.sent),
@@ -316,6 +327,8 @@ def pedido_to_json(pedido):
         'orgao': pedido.orgao.name,
         'author': pedido.author.name,
         'situacao': pedido.situation,
+        'description': pedido.description,
+        'date': date_to_json(pedido.request_date),
         'deadline': date_to_json(pedido.deadline),
         'keywords': [k.name for k in pedido.keywords],
         'messages': [msg_to_json(m)
