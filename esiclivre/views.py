@@ -169,7 +169,9 @@ class GetPedidoProtocolo(Resource):
         '''Returns a pedido by its protocolo.'''
         try:
             pedido = (db.session.query(Pedido)
-                      .filter_by(protocolo=protocolo).one())
+                      .options(joinedload('history'))
+                      .order_by('history.date')
+                      .filter_by(protocol=protocolo).one())
         except NoResultFound:
             api.abort(404)
         return pedido_to_json(pedido)
@@ -267,9 +269,9 @@ class GetAuthor(Resource):
             'pedidos': [
                 {
                     'id': p.id,
-                    'protocolo': p.protocolo,
+                    'protocolo': p.protocol,
                     'orgao': p.orgao,
-                    'state': p.get_state(),
+                    'situacao': p.situation(),
                     'deadline': date_to_json(p.deadline),
                     'keywords': [kw.name for kw in p.keywords],
                 }
@@ -297,10 +299,10 @@ def set_captcha_func(value):
 
 def msg_to_json(msg):
     return {
-        'text': msg.text,
-        'order': msg.order,
-        'received': date_to_json(msg.received),
-        'sent': date_to_json(msg.sent),
+        'text': msg.justification,
+        # 'order': msg.order,
+        'received': date_to_json(msg.date),
+        # 'sent': date_to_json(msg.sent),
         # TODO: como colocar o anexo aqui? link para download?
     }
 
@@ -309,12 +311,12 @@ def pedido_to_json(pedido):
     '''Returns detailed information about a pedido.'''
     return {
         'id': pedido.id,
-        'protocolo': pedido.protocolo,
-        'orgao': pedido.orgao,
+        'protocolo': pedido.protocol,
+        'orgao': pedido.orgao.name,
         'author': pedido.author.name,
-        'state': pedido.get_state(),
+        'situacao': pedido.situation,
         'deadline': date_to_json(pedido.deadline),
         'keywords': [k.name for k in pedido.keywords],
         # TODO: precisa dar sort?
-        'messages': [msg_to_json(m) for m in pedido.messages]
+        'messages': [msg_to_json(m) for m in pedido.history]
     }
