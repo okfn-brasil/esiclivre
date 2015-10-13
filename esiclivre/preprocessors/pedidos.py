@@ -279,15 +279,17 @@ def fix_attachment_name_and_extension():
 
 
 def update_pedido_messages(pre_pedido, pedido):
-    '''Update messages for a pedido. Messages with same date and justification
-    are considered equal.'''
+    '''Update messages for a pedido.'''
     new_insetion = False
     for item in pre_pedido.history:
         # Check if is a new msg
         already_inserted = False
         for itemDB in pedido.history:
+            # justification can be empty, so using all fields
             if (item.date == itemDB.date and
-               item.justification == itemDB.justification):
+               item.justification == itemDB.justification and
+               item.situation == itemDB.situation and
+               item.responsible == itemDB.responsible):
                 already_inserted = True
 
         # Insert if is a new msg
