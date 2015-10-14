@@ -358,12 +358,6 @@ def save_pedido_into_db(pre_pedido):
         extensions.db.session.add(orgao)
         extensions.db.session.commit()
     pedido.orgao = orgao
-    # if pre_pedido.orgao:
-    #     pedido.orgao = pre_pedido.orgao
-    # else:
-    #     pedido.orgao = 'desconhecido'
-    #     print('Aviso: orgao sendo marcado como desconhecido. Protolo: ' +
-    #           str(pre_pedido.protocolo))
 
     pedido.interessado = pre_pedido.interessado
     pedido.situation = pre_pedido.situation
