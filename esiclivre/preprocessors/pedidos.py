@@ -323,17 +323,20 @@ def create_pedido_attachments(pre_pedido):
 
 
 def save_pedido_into_db(pre_pedido):
+
     # check if there is a object with the same protocol
-    pedido = (models.Pedido.query.filter(
-        models.Pedido.protocol == pre_pedido.protocol)
-        .options(joinedload('history'))
-        .first())
+    pedido = models.Pedido.query.filter(
+        models.Pedido.protocol == pre_pedido.protocol
+    )
+    pedido = pedido.options(joinedload('history')).first()
+
     if not pedido:
         # if not, create one
         default_author = flask.current_app.config['DEFAULT_AUTHOR']
         try:
-            author = (extensions.db.session.query(models.Author)
-                      .filter_by(name=default_author).one())
+            author = extensions.db.session.query(models.Author).filter(
+                models.Author.name == default_author
+            ).one()
         except NoResultFound:
             author = models.Author(name=default_author)
             extensions.db.session.add(author)
