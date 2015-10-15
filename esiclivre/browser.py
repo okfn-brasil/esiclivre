@@ -28,6 +28,7 @@ import time
 from multiprocessing import Process, Manager
 from datetime import datetime
 
+import arrow
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 import speech_recognition as sr
@@ -397,26 +398,25 @@ class ESicLivre(object):
         # Inicialmente, a atualização dos pedidos é feita uma vez ao dia
         # TODO: Abrir uma issue para discutir melhor o processo de atualização
         # de pedidos
-        had_update_today = PedidosUpdate.query.filter_by(
-            date=datetime.today()
-        ).count() > 0
+        last_update = PedidosUpdate.query.order_by(PedidosUpdate.date.desc()).first() #noqa
+        last_update = last_update.date.datetime if last_update else None
 
-        if had_update_today:
+        if last_update and last_update.date() == arrow.now().datetime.date():
             print("Já houve atualização hoje!")
             return None
         else:
-            pedidos_preproc.update_pedidos_list(self.browser)
+            pedidos_preproc.update_pedidos_list(self)
 
         print("Nothing more to do...")
 
     def update_orgaos_list(self):
-        # Clear table
-        db.session.query(Orgao).delete()
         # Add orgaos from site
+        new_orgaos = 0
         for org in self.lista_de_orgaos():
-            model_org = Orgao(name=org)
-            db.session.add(model_org)
-        db.session.commit()
+            if not Orgao.query.filter_by(name=org).first():
+                db.session.add(Orgao(name=org))
+                new_orgaos += 1
+        db.session.commit() if new_orgaos > 0 else None
 
         self._last_update_of_orgao_list = datetime.today()
 

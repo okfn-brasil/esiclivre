@@ -22,12 +22,6 @@ pedido_attachments = sa.Table(
     db.Column('attachment_id', db.Integer, db.ForeignKey('attachment.id'))
 )
 
-# pedido_messages = sa.Table(
-#     'pedido_messages', db.metadata,
-#     db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
-#     db.Column('message_id', db.Integer, db.ForeignKey('message.id'))
-# )
-
 pedido_keyword = sa.Table(
     'pedido_keyword', db.metadata,
     db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
@@ -139,9 +133,6 @@ class Pedido(db.Model):
         'Orgao', secondary=pedido_orgao, backref='pedido', uselist=False
     )
 
-    # history = db.relationship(
-    #     'Message', secondary=pedido_messages, backref='pedido'
-    # )
     history = db.relationship("Message", backref="pedido")
 
     author = db.relationship(
