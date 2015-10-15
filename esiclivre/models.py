@@ -133,9 +133,6 @@ class Pedido(db.Model):
         'Orgao', secondary=pedido_orgao, backref='pedido', uselist=False
     )
 
-    # history = db.relationship(
-    #     'Message', secondary=pedido_messages, backref='pedido'
-    # )
     history = db.relationship("Message", backref="pedido")
 
     author = db.relationship(
