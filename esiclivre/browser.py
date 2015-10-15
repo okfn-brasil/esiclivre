@@ -26,7 +26,6 @@ import shutil
 import random
 import time
 from multiprocessing import Process, Manager
-from datetime import datetime
 
 import arrow
 from selenium import webdriver
@@ -257,21 +256,26 @@ class ESicLivre(object):
         print("> pedido text to input")
         self.entrar_com_texto_pedido(texto)
         print("> sending...")
-        self.clicar_enviar_pedido()
+        if False:
+            self.clicar_enviar_pedido()
 
-        print("> getting protocolo")
-        # Returns protocolo
-        protocolo = self.navegador.find_element_by_id(
-            "ctl00_MainContent_lbl_protocolo_confirmar"
-        ).text
-        deadline = self.navegador.find_element_by_id(
-            "ctl00_MainContent_lbl_prazo_atendimento_confirmar"
-        ).text
-        # ctl00_MainContent_lbl_data_solicitacao_confirmar
-        # ctl00_MainContent_lbl_descricao_pedido_confirmar
-        # ctl00_MainContent_lbl_orgao_confirmar
-        # ctl00_MainContent_lbl_solicitante_confirmar
-        return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
+            print("> getting protocolo")
+            # Returns protocolo
+            protocolo = self.navegador.find_element_by_id(
+                "ctl00_MainContent_lbl_protocolo_confirmar"
+            ).text
+            deadline = self.navegador.find_element_by_id(
+                "ctl00_MainContent_lbl_prazo_atendimento_confirmar"
+            ).text
+            # ctl00_MainContent_lbl_data_solicitacao_confirmar
+            # ctl00_MainContent_lbl_descricao_pedido_confirmar
+            # ctl00_MainContent_lbl_orgao_confirmar
+            # ctl00_MainContent_lbl_solicitante_confirmar
+            # return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
+            return int(protocolo), arrow.get(deadline, ['DD/MM/YYYY'])
+        else:
+            from random import randint
+            return randint(0, 100000), arrow.utcnow()
 
     def lista_de_orgaos(self):
         self.ir_para_registrar_pedido()
@@ -355,12 +359,15 @@ class ESicLivre(object):
                     if len(orgaos) < 5:
                         self.update_orgaos_list()
 
+                    pedidos_preproc.update_pedidos_list(self)
+
                     counter = 0
                     while self.safe_dict['running']:
                         # Keep alive; for how long? ...
                         if counter == 120:
 
-                            if self._last_update_of_orgao_list != datetime.today():
+                            if (self._last_update_of_orgao_list.day !=
+                               arrow.utcnow().day):
                                 print('Calling update_orgaos_list...')
                                 self.update_orgaos_list()
 
@@ -400,6 +407,11 @@ class ESicLivre(object):
         # de pedidos
         last_update = PedidosUpdate.query.order_by(PedidosUpdate.date.desc()).first() #noqa
         last_update = last_update.date.datetime if last_update else None
+        # had_update_today = PedidosUpdate.query.filter(
+        #     PedidosUpdate.date >= arrow.utcnow().replace(hour=0,
+        #                                                  minute=0,
+        #                                                  second=0)
+        # ).count() > 0
 
         if last_update and last_update.date() == arrow.now().datetime.date():
             print("Já houve atualização hoje!")
@@ -418,7 +430,7 @@ class ESicLivre(object):
                 new_orgaos += 1
         db.session.commit() if new_orgaos > 0 else None
 
-        self._last_update_of_orgao_list = datetime.today()
+        self._last_update_of_orgao_list = arrow.utcnow()
 
         print("Last update of the 'orgaos' list: {}".format(
             self._last_update_of_orgao_list
