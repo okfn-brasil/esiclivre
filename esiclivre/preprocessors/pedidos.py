@@ -339,8 +339,7 @@ def save_pedido_into_db(pre_pedido):
             extensions.db.session.add(author)
             extensions.db.session.commit()
 
-        pedido = models.Pedido(protocol=pre_pedido.protocol,
-                               author=author)
+        pedido = models.Pedido(protocol=pre_pedido.protocol, author=author)
         pedido.add_keyword('recuperado')
         extensions.db.session.add(pedido)
 
@@ -349,27 +348,19 @@ def save_pedido_into_db(pre_pedido):
         orgao_name = 'desconhecido'
     else:
         orgao_name = pre_pedido.orgao
+
     orgao = models.Orgao.query.filter_by(name=orgao_name).first()
     if not orgao:
         orgao = models.Orgao(name=orgao_name)
         extensions.db.session.add(orgao)
         extensions.db.session.commit()
     pedido.orgao = orgao
-    # if pre_pedido.orgao:
-    #     pedido.orgao = pre_pedido.orgao
-    # else:
-    #     pedido.orgao = 'desconhecido'
-    #     print('Aviso: orgao sendo marcado como desconhecido. Protolo: ' +
-    #           str(pre_pedido.protocolo))
 
     pedido.interessado = pre_pedido.interessado
     pedido.situation = pre_pedido.situation
     pedido.request_date = pre_pedido.request_date
     pedido.contact_option = pre_pedido.contact_option
     pedido.description = pre_pedido.description
-
-    # TODO: Como preencher o deadline?
-    # TODO: Como preencher o kw (keyword)?
 
     extensions.db.session.commit()
 

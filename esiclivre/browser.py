@@ -410,13 +410,13 @@ class ESicLivre(object):
         print("Nothing more to do...")
 
     def update_orgaos_list(self):
-        # Clear table
-        db.session.query(Orgao).delete()
         # Add orgaos from site
+        new_orgaos = 0
         for org in self.lista_de_orgaos():
-            model_org = Orgao(name=org)
-            db.session.add(model_org)
-        db.session.commit()
+            if not Orgao.query.filter_by(name=org).first():
+                db.session.add(Orgao(name=org))
+                new_orgaos += 1
+        db.session.commit() if new_orgaos > 0 else None
 
         self._last_update_of_orgao_list = datetime.today()
 
