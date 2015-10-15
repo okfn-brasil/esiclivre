@@ -302,6 +302,25 @@ class ListAuthors(Resource):
         }
 
 
+@api.route('/prepedidos')
+class PrePedidoAPI(Resource):
+
+    def get(self):
+        '''List PrePedidos.'''
+        q = db.session.query(PrePedido, Author).filter_by(state='WAITING')
+        q = q.filter(PrePedido.author_id == Author.id)
+
+        return {
+            'prepedidos': [{
+                'text': p.text,
+                'orgao': p.orgao_name,
+                'created': date_to_json(p.created_at),
+                'keywords': p.keywords,
+                'author': a.name,
+            } for p, a in q.all()]
+        }
+
+
 def set_captcha_func(value):
     '''Sets a captcha to be tried by the browser.'''
     api.browser.set_captcha(value)
