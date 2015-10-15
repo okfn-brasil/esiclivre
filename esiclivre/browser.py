@@ -256,26 +256,22 @@ class ESicLivre(object):
         print("> pedido text to input")
         self.entrar_com_texto_pedido(texto)
         print("> sending...")
-        if False:
-            self.clicar_enviar_pedido()
+        self.clicar_enviar_pedido()
 
-            print("> getting protocolo")
-            # Returns protocolo
-            protocolo = self.navegador.find_element_by_id(
-                "ctl00_MainContent_lbl_protocolo_confirmar"
-            ).text
-            deadline = self.navegador.find_element_by_id(
-                "ctl00_MainContent_lbl_prazo_atendimento_confirmar"
-            ).text
-            # ctl00_MainContent_lbl_data_solicitacao_confirmar
-            # ctl00_MainContent_lbl_descricao_pedido_confirmar
-            # ctl00_MainContent_lbl_orgao_confirmar
-            # ctl00_MainContent_lbl_solicitante_confirmar
-            # return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
-            return int(protocolo), arrow.get(deadline, ['DD/MM/YYYY'])
-        else:
-            from random import randint
-            return randint(0, 100000), arrow.utcnow()
+        print("> getting protocolo")
+        # Returns protocolo
+        protocolo = self.navegador.find_element_by_id(
+            "ctl00_MainContent_lbl_protocolo_confirmar"
+        ).text
+        deadline = self.navegador.find_element_by_id(
+            "ctl00_MainContent_lbl_prazo_atendimento_confirmar"
+        ).text
+        # ctl00_MainContent_lbl_data_solicitacao_confirmar
+        # ctl00_MainContent_lbl_descricao_pedido_confirmar
+        # ctl00_MainContent_lbl_orgao_confirmar
+        # ctl00_MainContent_lbl_solicitante_confirmar
+        # return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
+        return int(protocolo), arrow.get(deadline, ['DD/MM/YYYY'])
 
     def lista_de_orgaos(self):
         self.ir_para_registrar_pedido()
