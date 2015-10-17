@@ -89,23 +89,6 @@ class MessageApi(Resource):
 @api.route('/pedidos')
 class PedidoApi(Resource):
 
-    # @api.doc(parser=api.create_parser('page', 'per_page_num'))
-    # def get(self):
-    #     '''List pedidos by decrescent time.'''
-    #     args = api.general_parse()
-    #     page = args['page']
-    #     per_page_num = args['per_page_num']
-    #     pedidos = (db.session.query(Message, Pedido)
-    #                .filter(Message.pedido_id == Pedido.id)
-    #                .order_by(desc(Message.received)))
-    #                # .distinct(Message.pedido_id))
-    #     # Limit que number of results per page
-    #     pedidos, total = paginate(pedidos, page, per_page_num)
-    #     return {
-    #         'pedidos': [pedido_to_json(pedido) for m, pedido in pedidos],
-    #         'total': total,
-    #     }
-
     @api.doc(parser=api.create_parser('token', 'text', 'orgao', 'keywords'))
     def post(self):
         '''Adds a new pedido to be submited to eSIC.'''
@@ -142,7 +125,6 @@ class PedidoApi(Resource):
 
         # Set keywords
         for keyword_name in args['keywords']:
-            # pedido.add_keyword(keyword_name)
             try:
                 keyword = (db.session.query(Keyword)
                            .filter_by(name=keyword_name).one())
@@ -157,8 +139,6 @@ class PedidoApi(Resource):
 
         db.session.add(pre_pedido)
         db.session.commit()
-        # TODO: o que retornar aqui?
-        # return pedido_to_json(pedido)
         return {'status': 'ok'}
 
 
@@ -171,7 +151,6 @@ class GetPedidoProtocolo(Resource):
             pedido = (db.session.query(Pedido)
                       .options(joinedload('history'))
                       .options(joinedload('keywords'))
-                      # .order_by('Message.date')
                       .filter_by(protocol=protocolo).one())
         except NoResultFound:
             api.abort(404)
@@ -200,17 +179,10 @@ class GetPedidoKeyword(Resource):
                        .options(joinedload('pedidos'))
                        .options(joinedload('pedidos.history'))
                        .filter_by(name=keyword_name).one()).pedidos
-            # pedidos = (db.session.query(Pedido)
-            #            .filter(Pedido.kw.contains(keyword_name)).all())
         except NoResultFound:
             pedidos = []
         return {
             'keyword': keyword_name,
-            # 'pedidos': [pedido_to_json(pedido) for pedido in pedidos],
-            # 'pedidos': sorted([pedido_to_json(pedido)
-            #                    for pedido in pedidos],
-            #                   key=lambda p: p['messages'][0]['received'],
-            #                   reverse=True)
             'pedidos': [pedido_to_json(pedido)
                         for pedido in sorted(pedidos,
                         key=lambda p: p.request_date,
@@ -227,28 +199,6 @@ class GetPedidoOrgao(Resource):
         except NoResultFound:
             api.abort(404)
         return pedido_to_json(pedido)
-
-
-# @api.route('/keywords/<string:keyword_name>')
-# class GetKeyword(Resource):
-
-#     def get(self, keyword_name):
-#         '''Returns pedidos marked with a specific keyword.'''
-#         try:
-#             keyword = (db.session.query(Keyword)
-#                        .filter_by(name=keyword_name).one())
-#         except NoResultFound:
-#             api.abort(404)
-#         return {
-#             'name': keyword.name,
-#             'pedidos': [
-#                 {
-#                     'id': pedido.id,
-#                     'protoloco': pedido.protocolo,
-#                 }
-#                 for pedido in keyword.pedidos
-#             ]
-#         }
 
 
 @api.route('/keywords')
@@ -324,32 +274,3 @@ class PrePedidoAPI(Resource):
 def set_captcha_func(value):
     '''Sets a captcha to be tried by the browser.'''
     api.browser.set_captcha(value)
-
-
-def msg_to_json(msg):
-    return {
-        'text': msg.justification,
-        'situacao': msg.situation,
-        'responsavel': msg.responsible,
-        # 'order': msg.order,
-        'received': date_to_json(msg.date),
-        # 'sent': date_to_json(msg.sent),
-        # TODO: como colocar o anexo aqui? link para download?
-    }
-
-
-def pedido_to_json(pedido):
-    '''Returns detailed information about a pedido.'''
-    return {
-        'id': pedido.id,
-        'protocolo': pedido.protocol,
-        'orgao': pedido.orgao.name,
-        'author': pedido.author.name,
-        'situacao': pedido.situation,
-        'description': pedido.description,
-        'date': date_to_json(pedido.request_date),
-        'deadline': date_to_json(pedido.deadline),
-        'keywords': [k.name for k in pedido.keywords],
-        'messages': [msg_to_json(m)
-                     for m in sorted(pedido.history, key=lambda m: m.date)],
-    }
