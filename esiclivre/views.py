@@ -13,7 +13,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from flask.ext.restplus import Resource
 
 from viralata.utils import decode_token
-from cutils import date_to_json, paginate, ExtraApi
+from cutils import paginate, ExtraApi
 
 from models import Orgao, Author, PrePedido, Pedido, Message, Keyword
 from extensions import db, sv
@@ -78,8 +78,7 @@ class MessageApi(Resource):
         messages, total = paginate(messages, page, per_page_num)
         return {
             'messages': [
-                dict(msg_to_json(msg),
-                     keywords=[kw.name for kw in pedido.keywords])
+                dict(msg.as_dict, keywords=[kw.name for kw in pedido.keywords])
                 for pedido, msg in messages
             ],
             'total': total,
@@ -154,7 +153,7 @@ class GetPedidoProtocolo(Resource):
                       .filter_by(protocol=protocolo).one())
         except NoResultFound:
             api.abort(404)
-        return pedido_to_json(pedido)
+        return pedido.as_dict
 
 
 @api.route('/pedidos/id/<int:id_number>')
@@ -166,7 +165,7 @@ class GetPedidoId(Resource):
             pedido = db.session.query(Pedido).filter_by(id=id_number).one()
         except NoResultFound:
             api.abort(404)
-        return pedido_to_json(pedido)
+        return pedido.as_dict
 
 
 @api.route('/keywords/<string:keyword_name>')
@@ -183,10 +182,11 @@ class GetPedidoKeyword(Resource):
             pedidos = []
         return {
             'keyword': keyword_name,
-            'pedidos': [pedido_to_json(pedido)
-                        for pedido in sorted(pedidos,
-                        key=lambda p: p.request_date,
-                        reverse=True)],
+            'pedidos': [
+                pedido.as_dict for pedido in sorted(
+                    pedidos, key=lambda p: p.request_date, reverse=True
+                )
+            ],
         }
 
 
@@ -198,7 +198,7 @@ class GetPedidoOrgao(Resource):
             pedido = db.session.query(Pedido).filter_by(orgao=orgao).one()
         except NoResultFound:
             api.abort(404)
-        return pedido_to_json(pedido)
+        return pedido.as_dict
 
 
 @api.route('/keywords')
@@ -232,7 +232,7 @@ class GetAuthor(Resource):
                     'protocolo': p.protocol,
                     'orgao': p.orgao,
                     'situacao': p.situation(),
-                    'deadline': date_to_json(p.deadline),
+                    'deadline': p.deadline.isoformat() if p.deadline else '',
                     'keywords': [kw.name for kw in p.keywords],
                 }
                 for p in author.pedidos
@@ -264,7 +264,7 @@ class PrePedidoAPI(Resource):
             'prepedidos': [{
                 'text': p.text,
                 'orgao': p.orgao_name,
-                'created': date_to_json(p.created_at),
+                'created': p.created_at.isoformat(),
                 'keywords': p.keywords,
                 'author': a.name,
             } for p, a in q.all()]
