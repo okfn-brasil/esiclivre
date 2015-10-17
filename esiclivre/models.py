@@ -59,7 +59,7 @@ class PrePedido(db.Model):
     updated_at = db.Column(sa_utils.ArrowType)
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {
             'id': self.id,
             'author_id': self.author_id,
@@ -151,7 +151,7 @@ class Pedido(db.Model):
     )
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {
             'id': self.id,
             'protocol': self.protocol,
@@ -160,12 +160,12 @@ class Pedido(db.Model):
             'request_date': self.request_date,
             'contact_option': self.contact_option,
             'description': self.description,
-            'deadline': self.deadline.isoformat() if seld.deadline else '',
+            'deadline': self.deadline.isoformat() if self.deadline else '',
             'orgao_name': self.orgao_name,
-            'history': [m.as_json for m in self.history],
-            'author': a.as_json,
-            'keywords': [kw.as_json for kw in self.keywords],
-            'attachments': [att.as_json for att in self.attachments]
+            'history': [m.as_dict for m in self.history],
+            'author': self.author.as_dict,
+            'keywords': [kw.as_dict for kw in self.keywords],
+            'attachments': [att.as_dict for att in self.attachments]
         }
 
     def add_keyword(self, keyword_name):
@@ -188,7 +188,7 @@ class Orgao(db.Model):
     name = db.Column(db.String(255), nullable=False, unique=True)
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {'id': self.id, 'name': self.name}
 
 
@@ -210,7 +210,7 @@ class Message(db.Model):
                           nullable=False)
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {
             'id': self.id,
             'situation': self.situation,
@@ -229,7 +229,7 @@ class Author(db.Model):
     name = db.Column(db.String(255), nullable=False, unique=True)
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {'id': self.id, 'name': self.name}
 
 
@@ -242,7 +242,7 @@ class Keyword(db.Model):
     name = db.Column(db.String(255), nullable=False, unique=True, index=True)
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {'id': self.id, 'name': self.name}
 
 
@@ -259,7 +259,7 @@ class Attachment(db.Model):
     ia_url = db.Column(sa_utils.URLType)
 
     @property
-    def as_json(self):
+    def as_dict(self):
         return {
             'id': self.id,
             'name': self.name,
