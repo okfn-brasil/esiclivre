@@ -271,7 +271,8 @@ class ESicLivre(object):
         # ctl00_MainContent_lbl_descricao_pedido_confirmar
         # ctl00_MainContent_lbl_orgao_confirmar
         # ctl00_MainContent_lbl_solicitante_confirmar
-        return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
+        # return int(protocolo), datetime.strptime(deadline, "%d/%m/%Y")
+        return int(protocolo), arrow.get(deadline, ['DD/MM/YYYY'])
 
     def lista_de_orgaos(self):
         self.ir_para_registrar_pedido()
@@ -355,12 +356,15 @@ class ESicLivre(object):
                     if len(orgaos) < 5:
                         self.update_orgaos_list()
 
+                    pedidos_preproc.update_pedidos_list(self)
+
                     counter = 0
                     while self.safe_dict['running']:
                         # Keep alive; for how long? ...
                         if counter == 120:
 
-                            if self._last_update_of_orgao_list != datetime.today():
+                            if (self._last_update_of_orgao_list.day !=
+                               arrow.utcnow().day):
                                 print('Calling update_orgaos_list...')
                                 self.update_orgaos_list()
 

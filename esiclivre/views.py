@@ -73,7 +73,7 @@ class MessageApi(Resource):
         messages = (db.session.query(Pedido, Message)
                     .options(joinedload('keywords'))
                     .filter(Message.pedido_id == Pedido.id)
-                    .order_by(desc(Message.received)))
+                    .order_by(desc(Message.date)))
         # Limit que number of results per page
         messages, total = paginate(messages, page, per_page_num)
         return {
@@ -121,7 +121,7 @@ class PedidoApi(Resource):
 
         # Validate 'orgao'
         if args['orgao']:
-            orgao_exists = db.session.query.filter_by(
+            orgao_exists = db.session.query(Orgao).filter_by(
                 name=args['orgao']).count() == 1
             if not orgao_exists:
                 api.abort_with_msg(400, 'Orgao not found.', ['orgao'])
@@ -147,7 +147,7 @@ class PedidoApi(Resource):
                 keyword = (db.session.query(Keyword)
                            .filter_by(name=keyword_name).one())
             except NoResultFound:
-                keyword = Keyword(keyword_name)
+                keyword = Keyword(name=keyword_name)
                 db.session.add(keyword)
                 db.session.commit()
         pre_pedido.keywords = ','.join(k for k in args['keywords'])
@@ -299,6 +299,25 @@ class ListAuthors(Resource):
 
         return {
             "authors": [a[0] for a in authors]
+        }
+
+
+@api.route('/prepedidos')
+class PrePedidoAPI(Resource):
+
+    def get(self):
+        '''List PrePedidos.'''
+        q = db.session.query(PrePedido, Author).filter_by(state='WAITING')
+        q = q.filter(PrePedido.author_id == Author.id)
+
+        return {
+            'prepedidos': [{
+                'text': p.text,
+                'orgao': p.orgao_name,
+                'created': date_to_json(p.created_at),
+                'keywords': p.keywords,
+                'author': a.name,
+            } for p, a in q.all()]
         }
 
 
