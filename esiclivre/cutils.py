@@ -13,11 +13,6 @@ def paginate(query, page, per_page_num):
     return (query.offset(page*per_page_num).limit(per_page_num).all(), total)
 
 
-def date_to_json(date):
-    '''Helper to format dates.'''
-    return str(date)
-
-
 class ExtraApi(Api):
 
     def __init__(self, *args, **kwargs):
