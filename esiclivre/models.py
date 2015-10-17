@@ -10,12 +10,6 @@ from sqlalchemy.orm.exc import NoResultFound
 from extensions import db
 
 
-pedido_orgao = sa.Table(
-    'pedido_orgao', db.metadata,
-    db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
-    db.Column('orgao_id', db.Integer, db.ForeignKey('orgao.id'))
-)
-
 pedido_attachments = sa.Table(
     'pedido_attachments', db.metadata,
     db.Column('pedido_id', db.Integer, db.ForeignKey('pedido.id')),
@@ -129,9 +123,7 @@ class Pedido(db.Model):
 
     deadline = db.Column(sa_utils.ArrowType, index=True)
 
-    orgao = db.relationship(
-        'Orgao', secondary=pedido_orgao, backref='pedido', uselist=False
-    )
+    orgao_name = db.Column(db.String(255))
 
     history = db.relationship("Message", backref="pedido")
 
