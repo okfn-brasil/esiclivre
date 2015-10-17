@@ -58,6 +58,17 @@ class PrePedido(db.Model):
 
     updated_at = db.Column(sa_utils.ArrowType)
 
+    @property
+    def as_json(self):
+        return {
+            'id': self.id,
+            'author_id': self.author_id,
+            'orgao_name': self.orgao_name,
+            'text': self.text,
+            'keywords': [keyword for keyword in self.keywords.split(',')],
+            'state': self.state
+        }
+
     @classmethod
     def get_all_pending(self):
         return self.query.filter_by(state='WAITING')
@@ -139,6 +150,24 @@ class Pedido(db.Model):
         'Attachment', secondary=pedido_attachments, backref='pedido'
     )
 
+    @property
+    def as_json(self):
+        return {
+            'id': self.id,
+            'protocol': self.protocol,
+            'interessado': self.interessado,
+            'situation': self.situation,
+            'request_date': self.request_date,
+            'contact_option': self.contact_option,
+            'description': self.description,
+            'deadline': self.deadline.isoformat() if seld.deadline else '',
+            'orgao_name': self.orgao_name,
+            'history': [m.as_json for m in self.history],
+            'author': a.as_json,
+            'keywords': [kw.as_json for kw in self.keywords],
+            'attachments': [att.as_json for att in self.attachments]
+        }
+
     def add_keyword(self, keyword_name):
         try:
             keyword = (db.session.query(Keyword)
@@ -158,6 +187,10 @@ class Orgao(db.Model):
 
     name = db.Column(db.String(255), nullable=False, unique=True)
 
+    @property
+    def as_json(self):
+        return {'id': self.id, 'name': self.name}
+
 
 class Message(db.Model):
 
@@ -176,6 +209,16 @@ class Message(db.Model):
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedido.id'),
                           nullable=False)
 
+    @property
+    def as_json(self):
+        return {
+            'id': self.id,
+            'situation': self.situation,
+            'justification': self.justification,
+            'responsible': self.responsible,
+            'date': self.date.isoformat(),
+        }
+
 
 class Author(db.Model):
 
@@ -185,6 +228,10 @@ class Author(db.Model):
 
     name = db.Column(db.String(255), nullable=False, unique=True)
 
+    @property
+    def as_json(self):
+        return {'id': self.id, 'name': self.name}
+
 
 class Keyword(db.Model):
 
@@ -193,6 +240,10 @@ class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(255), nullable=False, unique=True, index=True)
+
+    @property
+    def as_json(self):
+        return {'id': self.id, 'name': self.name}
 
 
 class Attachment(db.Model):
@@ -206,3 +257,11 @@ class Attachment(db.Model):
     created_at = db.Column(sa_utils.ArrowType)
 
     ia_url = db.Column(sa_utils.URLType)
+
+    @property
+    def as_json(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'ia_url': self.ia_url
+        }
