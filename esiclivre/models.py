@@ -189,7 +189,8 @@ class Orgao(db.Model):
 
     @property
     def as_dict(self):
-        return {'id': self.id, 'name': self.name}
+        return self.name
+        # return {'id': self.id, 'name': self.name}
 
 
 class Message(db.Model):
@@ -230,7 +231,8 @@ class Author(db.Model):
 
     @property
     def as_dict(self):
-        return {'id': self.id, 'name': self.name}
+        return self.name
+        # return {'id': self.id, 'name': self.name}
 
 
 class Keyword(db.Model):
@@ -243,7 +245,8 @@ class Keyword(db.Model):
 
     @property
     def as_dict(self):
-        return {'id': self.id, 'name': self.name}
+        return self.name
+        # return {'id': self.id, 'name': self.name}
 
 
 class Attachment(db.Model):
