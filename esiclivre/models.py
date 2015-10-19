@@ -157,7 +157,7 @@ class Pedido(db.Model):
             'protocol': self.protocol,
             'interessado': self.interessado,
             'situation': self.situation,
-            'request_date': self.request_date,
+            'request_date': self.request_date.isoformat(),
             'contact_option': self.contact_option,
             'description': self.description,
             'deadline': self.deadline.isoformat() if self.deadline else '',
