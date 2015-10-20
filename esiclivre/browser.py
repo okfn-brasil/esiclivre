@@ -405,7 +405,7 @@ class ESicLivre(object):
         last_update = PedidosUpdate.query.order_by(PedidosUpdate.date.desc()).first() #noqa
         last_update = last_update.date.datetime if last_update else None
 
-        if last_update and last_update.date() == arrow.now().datetime.date():
+        if last_update and last_update.date() == arrow.now():
             print("Já houve atualização hoje!")
             return None
         else:
