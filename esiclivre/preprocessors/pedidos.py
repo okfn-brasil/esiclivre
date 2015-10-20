@@ -314,7 +314,7 @@ def create_pedido_attachments(pre_pedido):
         attachment = models.Attachment()
         attachment.created_at = item.created_at
         attachment.name = item.filename
-        attachment.ia_url = 'https://archive.org/download/pedido_{}/{}'.format(
+        attachment.ia_url = u'https://archive.org/download/pedido_{}/{}'.format(
             pre_pedido.protocol, item.filename
         )
 
