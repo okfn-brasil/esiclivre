@@ -386,8 +386,11 @@ class ESicLivre(object):
 
     def active_loop(self):
         """Does routine stuff inside eSIC, like posting pedidos."""
-        pending_pre_pedidos = PrePedido.get_all_pending()
-        # Send new pedidos
+
+        pending_pre_pedidos = db.session.query(
+            PrePedido.state == 'WAITING'
+        ).all()
+
         for pre_pedido in pending_pre_pedidos:
 
             protocolo, deadline = self.postar_pedido(
@@ -403,9 +406,8 @@ class ESicLivre(object):
         # TODO: Abrir uma issue para discutir melhor o processo de atualização
         # de pedidos
         last_update = PedidosUpdate.query.order_by(PedidosUpdate.date.desc()).first() #noqa
-        last_update = last_update.date.datetime if last_update else None
 
-        if last_update and last_update.date() == arrow.now():
+        if last_update and last_update.date.date() == arrow.now().date():
             print("Já houve atualização hoje!")
             return None
         else:
