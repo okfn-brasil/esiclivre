@@ -69,10 +69,6 @@ class PrePedido(db.Model):
             'state': self.state
         }
 
-    @classmethod
-    def get_all_pending(self):
-        return self.query.filter_by(state='WAITING')
-
     @property
     def orgao(self):
         return Orgao.query.filter_by(name=self.orgao_name).one()
