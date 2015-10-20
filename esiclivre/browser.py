@@ -414,7 +414,7 @@ class ESicLivre(object):
         print("Nothing more to do...")
 
     def update_orgaos_list(self):
-        Orgao.query.delete()
+        db.session.query(Orgao).delete()
         db.session.commit()
 
         new_orgaos = False
