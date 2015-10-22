@@ -388,8 +388,7 @@ class ESicLivre(object):
         """Does routine stuff inside eSIC, like posting pedidos."""
 
         pending_pre_pedidos = db.session.query(
-            PrePedido.state == 'WAITING'
-        ).all()
+            PrePedido).filter_by(state='WAITING').all()
 
         for pre_pedido in pending_pre_pedidos:
 
