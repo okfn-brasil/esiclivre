@@ -1,6 +1,6 @@
 # Keys for IA: https://archive.org/account/s3.php
-export ACCESS_KEY=xxxxxxxxxxxxxxxx
-export SECRET_KEY=xxxxxxxxxxxxxxxx
+export IAS3_ACCESS_KEY=xxxxxxxxxxxxxxxx
+export IAS3_SECRET_KEY=xxxxxxxxxxxxxxxx
 
 echo "Abrindo monitor fantasma"
 Xvfb :10 -ac &
