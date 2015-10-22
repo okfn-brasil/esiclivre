@@ -394,7 +394,7 @@ class ESicLivre(object):
         for pre_pedido in pending_pre_pedidos:
 
             protocolo, deadline = self.postar_pedido(
-                pre_pedido.orgao, pre_pedido.text
+                pre_pedido.orgao_name, pre_pedido.text
             )
             pre_pedido.create_pedido(protocolo, deadline)
             db.session.commit()
