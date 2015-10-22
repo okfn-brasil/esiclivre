@@ -386,7 +386,9 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
         return None
     else:
 
-        item = internetarchive.Item('pedido_{}'.format(pedido_protocol))
+        item = internetarchive.Item('{prefix}_pedido_{protocol}'.format(
+            prefix=flask.current_app.config['ATTACHMENT_URL_PREFIX'],
+            protocol=pedido_protocol))
         metadata = dict(
             mediatype='pdf',
             creator='OKF',
