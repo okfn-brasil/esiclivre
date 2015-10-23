@@ -364,8 +364,8 @@ class ESicLivre(object):
                         if counter == 120:
 
                             if (not self._last_update_of_orgao_list or
-                               self._last_update_of_orgao_list.day !=
-                               arrow.utcnow().day):
+                               self._last_update_of_orgao_list.date() !=
+                               arrow.utcnow().date()):
                                 print('Calling update_orgaos_list...')
                                 self.update_orgaos_list()
 
@@ -405,10 +405,11 @@ class ESicLivre(object):
         # Inicialmente, a atualização dos pedidos é feita uma vez ao dia
         # TODO: Abrir uma issue para discutir melhor o processo de atualização
         # de pedidos
-        last_update = PedidosUpdate.query.order_by(PedidosUpdate.date.desc()).first() #noqa
+        last_update = db.session.query(PedidosUpdate).order_by(
+            PedidosUpdate.date.desc()).first()  # noqa
 
         if last_update and last_update.date.date() == arrow.now().date():
-            print("Já houve atualização hoje!")
+            print("%s: Já houve atualização hoje!" % arrow.now())
             return None
         else:
             pedidos_preproc.update_pedidos_list(self)
