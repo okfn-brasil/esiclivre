@@ -26,7 +26,7 @@ import shutil
 import random
 import time
 from multiprocessing import Process, Manager
-from datetime import datetime
+# from datetime import datetime
 
 import arrow
 from selenium import webdriver
@@ -363,7 +363,8 @@ class ESicLivre(object):
                         # Keep alive; for how long? ...
                         if counter == 120:
 
-                            if (self._last_update_of_orgao_list.day !=
+                            if (not self._last_update_of_orgao_list or
+                               self._last_update_of_orgao_list.day !=
                                arrow.utcnow().day):
                                 print('Calling update_orgaos_list...')
                                 self.update_orgaos_list()
@@ -427,7 +428,7 @@ class ESicLivre(object):
         if new_orgaos:
             db.session.commit()
 
-            self._last_update_of_orgao_list = datetime.today()
+            self._last_update_of_orgao_list = arrow.utcnow()
 
             print("Last update of the 'orgaos' list: {}".format(
                 self._last_update_of_orgao_list
