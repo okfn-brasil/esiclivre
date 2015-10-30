@@ -211,7 +211,7 @@ class Pedidos(object):
             # arquivos serem baixados ou completar N tentativas
 
             max_retries = 0
-            if '.part' in os.listdir(flask.current_app.config['DOWNLOADS_PATH']):  # noqa
+            if str('.part') in os.listdir(flask.current_app.config['DOWNLOADS_PATH']):  # noqa
                 logger.info("Existe algum download inacabado...")
                 while max_retries != 10:
 
@@ -267,8 +267,8 @@ def fix_attachment_name_and_extension():
     download_dir = flask.current_app.config['DOWNLOADS_PATH']
     for _file in os.listdir(download_dir):
 
+        _file = _file.decode('utf8')
         logger.info("file: {}".format(_file))
-
         _file_fullpath = '{}/{}'.format(download_dir, _file)
 
         if _file.endswith('.part'):

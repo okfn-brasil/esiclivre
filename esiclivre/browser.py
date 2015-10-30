@@ -137,7 +137,7 @@ class ESicLivre(object):
         link = self.base_url + "/Account/pgAudio.ashx?%s" % n
         self.navegador.get(link)
         time.sleep(3)
-        while self.nome_audio_captcha + ".part" in os.listdir(self.pasta):
+        while str(self.nome_audio_captcha + ".part") in os.listdir(self.pasta):
             time.sleep(1)
 
     def baixar_imagem_captcha(self):
