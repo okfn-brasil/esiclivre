@@ -63,6 +63,7 @@ def configure_logging(app):
         return
 
     import logging
+    import logging.handlers
 
     # Set info level on logger, which might be overwritten by handers.
     # Suppress DEBUG messages.
