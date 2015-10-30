@@ -2,6 +2,7 @@
 # coding: utf-8
 
 from __future__ import unicode_literals  # unicode by default
+import os
 
 from flask import Flask, send_file, send_from_directory
 from flask.ext.cors import CORS
@@ -17,6 +18,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_pyfile('../settings/common.py', silent=False)
     app.config.from_pyfile('../settings/local_settings.py', silent=False)
+    configure_logging(app)
     CORS(app, resources={r"*": {"origins": "*"}})
 
     # DB
@@ -51,3 +53,27 @@ def create_app():
         return send_file('static/captcha.jpg')
 
     return app
+
+
+def configure_logging(app):
+    """Configure file(info) and email(error) logging."""
+
+    if app.debug or app.testing:
+        # Skip debug and test mode. Just check standard output.
+        return
+
+    import logging
+
+    # Set info level on logger, which might be overwritten by handers.
+    # Suppress DEBUG messages.
+    app.logger.setLevel(logging.INFO)
+
+    info_log = os.path.join(app.config['LOG_FOLDER'], 'info.log')
+    info_file_handler = logging.handlers.RotatingFileHandler(
+        info_log, maxBytes=100000, backupCount=10)
+    info_file_handler.setLevel(logging.INFO)
+    info_file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s '
+        '[in %(pathname)s:%(lineno)d]')
+    )
+    app.logger.addHandler(info_file_handler)
