@@ -116,7 +116,7 @@ class ESicLivre(object):
     def transcribe_audio_captcha(self):
         self.logger.info("Transcribing audio captcha...")
         audio_path = os.path.join(self.pasta, self.nome_audio_captcha)
-        with sr.WavFile(audio_path) as source:
+        with sr.WavFile(str(audio_path)) as source:
             audio = self.recognizer.record(source)
         try:
             return self.recognizer.recognize(audio)
