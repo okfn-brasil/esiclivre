@@ -113,8 +113,8 @@ class ParsedPedido(object):
                 self.protocol, attachment.filename
             )
 
-            self.app.logger.info("anexo")
-            self.app.logger.info(attachment.filename)
+            logger.info("anexo")
+            logger.info(attachment.filename)
             result += (attachment,)
         return result
 
@@ -210,7 +210,7 @@ class Pedidos(object):
 
             max_retries = 0
             if '.part' in os.listdir(flask.current_app.config['DOWNLOADS_PATH']):  # noqa
-                self.app.logger.info("Existe algum download inacabado...")
+                logger.info("Existe algum download inacabado...")
                 while max_retries != 10:
 
                     download_dir = os.listdir(
@@ -223,10 +223,10 @@ class Pedidos(object):
                     )
 
                     if not uncomplete_download:
-                        self.app.logger.info("Sem downloads inacabados...")
+                        logger.info("Sem downloads inacabados...")
                         break
                     else:
-                        self.app.logger.info("Aguardar 1 segundo...")
+                        logger.info("Aguardar 1 segundo...")
                         time.sleep(1)
                         max_retries += 1
 
@@ -265,7 +265,7 @@ def fix_attachment_name_and_extension():
     download_dir = flask.current_app.config['DOWNLOADS_PATH']
     for _file in os.listdir(download_dir):
 
-        self.app.logger.info("file: {}".format(_file))
+        logger.info("file: {}".format(_file))
 
         _file_fullpath = '{}/{}'.format(download_dir, _file)
 
@@ -379,7 +379,7 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
     downloaded_attachments = os.listdir(download_dir)
 
     if filename not in [a for a in downloaded_attachments]:
-        self.app.logger.info("Arquivo {!r} não existe!.".format(filename))
+        logger.info("Arquivo {!r} não existe!.".format(filename))
         # TODO: O que fazer se o arquivo não estiver disponivel?
         # Já temos um caso onde o download não completa, mas por falha no
         # servidor do esic.
@@ -400,12 +400,14 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
 
         if not result or result[0].status_code != 200:
             # TODO: O que fazer nessa situação?
-            self.app.logger.info("Erro ao executar upload.")
+            logger.info("Erro ao executar upload.")
         else:
             os.remove('{}/{}'.format(download_dir, filename))
 
 
 def update_pedidos_list(browser):
+    global logger
+    logger = browser.logger
 
     # garantir que a tela inicial seja a de consulta de pedidos.
     browser.ir_para_consultar_pedido()
@@ -424,4 +426,4 @@ def update_pedidos_list(browser):
     )
     extensions.db.session.commit()
 
-    self.app.logger.info("Pedidos atualizados. Atualização registrada.")
+    logger.info("Pedidos atualizados. Atualização registrada.")

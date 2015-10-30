@@ -34,6 +34,7 @@ def create_app():
         email=app.config['ESIC_EMAIL'],
         senha=app.config['ESIC_PASSWORD'],
         pasta=app.config['DOWNLOADS_PATH'],
+        logger=app.logger,
         app=app,
         )
     app.browser = browser
