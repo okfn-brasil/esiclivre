@@ -410,7 +410,7 @@ class ESicLivre(object):
             PedidosUpdate.date.desc()).first()  # noqa
 
         if last_update and last_update.date.date() == arrow.now().date():
-            self.logger.info("%s: Já houve atualização hoje!" % arrow.now())
+            # self.logger.info("%s: Já houve atualização hoje!" % arrow.now())
             return None
         else:
             pedidos_preproc.update_pedidos_list(self)
