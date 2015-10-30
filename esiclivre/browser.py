@@ -84,7 +84,7 @@ class ESicLivre(object):
     def criar_navegador(self):
         """Retorna um navegador firefox configurado para salvar arquivos
         baixados em 'pasta'."""
-        print("Configuring and initiating browser...")
+        self.app.logger.info("Configuring and initiating browser...")
         fp = webdriver.FirefoxProfile()
         fp.set_preference("browser.download.folderList", 2)
         fp.set_preference("browser.download.manager.showWhenStarting", False)
@@ -113,7 +113,7 @@ class ESicLivre(object):
         self.navegador.get(self.base_url + "/Account/Login.aspx")
 
     def transcribe_audio_captcha(self):
-        print("Transcribing audio captcha...")
+        self.app.logger.info("Transcribing audio captcha...")
         audio_path = os.path.join(self.pasta, self.nome_audio_captcha)
         with sr.WavFile(audio_path) as source:
             audio = self.recognizer.record(source)
@@ -130,7 +130,7 @@ class ESicLivre(object):
             os.remove(cam_audio)
         except (OSError, IOError):
             pass
-        print("Downloading audio captcha...")
+        self.app.logger.info("Downloading audio captcha...")
         # Esse número deve ser usado para evitar problemas com a cache
         n = random.randint(1, 400)
         link = self.base_url + "/Account/pgAudio.ashx?%s" % n
@@ -245,21 +245,21 @@ class ESicLivre(object):
     # Funções Gerais
 
     def postar_pedido(self, orgao, texto):
-        print("> going to new pedido page")
+        self.app.logger.info("> going to new pedido page")
         self.ir_para_registrar_pedido()
         self.check_login_needed()
         # TODO: testar se está na página de fazer pedido
-        print("> getting orgaos buttons")
+        self.app.logger.info("> getting orgaos buttons")
         orgaos = self.criar_dicio_orgaos()
         # TODO: testar se órgão existe
-        print("> selecting orgao")
+        self.app.logger.info("> selecting orgao")
         orgaos[orgao].click()
-        print("> pedido text to input")
+        self.app.logger.info("> pedido text to input")
         self.entrar_com_texto_pedido(texto)
-        print("> sending...")
+        self.app.logger.info("> sending...")
         self.clicar_enviar_pedido()
 
-        print("> getting protocolo")
+        self.app.logger.info("> getting protocolo")
         # Returns protocolo
         protocolo = self.navegador.find_element_by_id(
             "ctl00_MainContent_lbl_protocolo_confirmar"
@@ -306,7 +306,7 @@ class ESicLivre(object):
             if captcha:
                 captcha = captcha.replace("ver ", "v")
                 captcha = captcha.replace(" ", "")
-                print("Transcribed captcha: %s" % captcha)
+                self.app.logger.info("Transcribed captcha: %s" % captcha)
                 if len(captcha) == 4:
                     break
             self.gerar_novo_captcha()
@@ -342,14 +342,14 @@ class ESicLivre(object):
         else:
             captcha = self.get_captcha()
 
-        print("Current captcha: %s" % captcha)
+        self.app.logger.info("Current captcha: %s" % captcha)
         # If captcha is unset, may need to wait someone to set it
         # If is set, login
         if captcha:
-            print("Trying to login...")
+            self.app.logger.info("Trying to login...")
             self.entrar_no_sistema(captcha)
             if not self.esta_em_login():
-                print("Seems to have logged in!")
+                self.app.logger.info("Seems to have logged in!")
                 try:
                     # Loads orgaos list if empty (or with only test data)
                     orgaos = db.session.query(Orgao.name).all()
@@ -366,7 +366,7 @@ class ESicLivre(object):
                             if (not self._last_update_of_orgao_list or
                                self._last_update_of_orgao_list.date() !=
                                arrow.utcnow().date()):
-                                print('Calling update_orgaos_list...')
+                                self.app.logger.info('Calling update_orgaos_list...')
                                 self.update_orgaos_list()
 
                             self.ir_para_registrar_pedido()
@@ -380,9 +380,9 @@ class ESicLivre(object):
                         time.sleep(5)
 
                 except LoginNeeded:
-                    print("Seems to have been logged out...")
+                    self.app.logger.info("Seems to have been logged out...")
 
-            print("Need new captcha...")
+            self.app.logger.info("Need new captcha...")
             self.preparar_receber_captcha()
 
     def active_loop(self):
@@ -398,7 +398,7 @@ class ESicLivre(object):
             )
             pre_pedido.create_pedido(protocolo, deadline)
             db.session.commit()
-            print('Sent!')
+            self.app.logger.info('Sent!')
         # TODO: ver se quem quer recorrer
         # TODO: ver precisa olhar respostas aos pedidos
 
@@ -409,12 +409,12 @@ class ESicLivre(object):
             PedidosUpdate.date.desc()).first()  # noqa
 
         if last_update and last_update.date.date() == arrow.now().date():
-            print("%s: Já houve atualização hoje!" % arrow.now())
+            self.app.logger.info("%s: Já houve atualização hoje!" % arrow.now())
             return None
         else:
             pedidos_preproc.update_pedidos_list(self)
 
-        print("Nothing more to do...")
+        self.app.logger.info("Nothing more to do...")
 
     def update_orgaos_list(self):
         db.session.query(Orgao).delete()
@@ -431,6 +431,6 @@ class ESicLivre(object):
 
             self._last_update_of_orgao_list = arrow.utcnow()
 
-            print("Last update of the 'orgaos' list: {}".format(
+            self.app.logger.info("Last update of the 'orgaos' list: {}".format(
                 self._last_update_of_orgao_list
             ))
