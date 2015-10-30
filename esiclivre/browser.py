@@ -65,7 +65,7 @@ class ESicLivre(object):
 
         self.try_break_audio_captcha = True
         self.nome_audio_captcha = "somCaptcha.wav"
-        self.recognizer = sr.Recognizer("pt-BR")
+        self.recognizer = sr.Recognizer(str('pt-BR'))
 
         self.user_agent = (
             "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:28.0)"
