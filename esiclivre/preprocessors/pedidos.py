@@ -111,9 +111,9 @@ class ParsedPedido(object):
             #     created_at.text.strip(), dayfirst=True)
             attachment.created_at = parse_date(created_at.text.strip())
 
-            upload_attachment_to_internet_archive(
-                self.protocol, attachment.filename
-            )
+            # upload_attachment_to_internet_archive(
+            #     self.protocol, attachment.filename
+            # )
 
             logger.info("anexo")
             logger.info(attachment.filename)
@@ -156,54 +156,46 @@ class ParsedPedido(object):
 
         return result
 
+    def upload_modified_attachments(self):
 
-class Pedidos(object):
+        attachments_el_id = 'ctl00_MainContent_grid_anexos_resposta'
+        # If pedido has no attachments
+        if not self._raw_data.select('#' + attachments_el_id):  # noqa
+            return None
 
-    _parsedpedidos = []
-    _pedido_pagesource = []
+        # Get the current pedido and its attachments from the DB
+        db_pedido = extensions.db.session.query(models.Pedido).filter_by(
+            protocol=self.protocol).options(joinedload('attachments')).first()
+        db_attachments = db_pedido.attachments if db_pedido else []
 
-    def set_full_data(self, browser):
-        self._full_data = browser.navegador.find_element_by_id(
-            'ctl00_MainContent_grid_pedido')
+        for attachment in self.attachments:
+            # Get last created_at time saved in DB
+            old_created_at = [a.created_at for a in db_attachments
+                              if a.name == attachment.filename]
+            old_created_at = old_created_at[0] if old_created_at else None
 
-    def get_all_pages_source(self, browser):
+            # Download and upload attachments that created_at changed
+            if not old_created_at or (attachment.created_at != old_created_at):
+                logger.info(
+                    'Anexo modificado ou novo. Baixando e enviando para IA.')
 
-        total_of_pedidos = len(self._full_data.find_elements_by_tag_name('a'))
-        for pos in range(total_of_pedidos):
+                attachments_el = self._browser.navegador.find_element_by_id(
+                    attachments_el_id)
+                if attachments_el:
+                    # TODO: atualmente está baixando TODOS os anexos do pedido,
+                    # o certo seria baixar apenas o anexo cuja data realmente
+                    # mudou
+                    self.download_pedido_attachments(attachments_el)
 
-            self.set_full_data(browser)
-            self._full_data.find_elements_by_tag_name('a')[pos].click()
-
-            pagesource = bs4.BeautifulSoup(browser.navegador.page_source,
-                                           "html5lib")
-
-            self._pedido_pagesource.append(pagesource)
-
-            if not pagesource.select('#ctl00_MainContent_grid_anexos_resposta'):  # noqa
-                browser.navegador.back()
-                continue
-            else:
-                # a ideia era baixar os anexo apenas durante o processo de
-                # parsear o codigo fonte, mas ainda estou com dificuldades
-                # para fazer uma requisição valida para o servidor sem usar o
-                # selenium. Em um proximo refactoring esse processo pode ser
-                # feito em durante o parsing do page source, background ou não.
-                attachments = browser.navegador.find_element_by_id(
-                    'ctl00_MainContent_grid_anexos_resposta'
+                upload_attachment_to_internet_archive(
+                    self.protocol, attachment.filename
                 )
-                if attachments:
-                    self.get_pedido_attachments(attachments)
 
-            browser.navegador.back()
-        fix_attachment_name_and_extension()
-
-    def get_pedido_attachments(self, attachments):
+    def download_pedido_attachments(self, attachments):
 
         for attachment in attachments.find_elements_by_tag_name('input'):
 
             # baixar o arquivo
-            # TODO: Ignorar arquivos que já existem? Como lidar com a
-            # atualização de um anexo?
             attachment.click()
 
             # a ideia aqui é que se houver algum arquivo .part, ou seja, algum
@@ -232,6 +224,33 @@ class Pedidos(object):
                         time.sleep(1)
                         max_retries += 1
 
+
+class Pedidos(object):
+
+    _parsedpedidos = []
+    _pedido_pagesource = []
+
+    def set_full_data(self, browser):
+        self._full_data = browser.navegador.find_element_by_id(
+            'ctl00_MainContent_grid_pedido')
+
+    def get_all_pages_source(self, browser):
+
+        total_of_pedidos = len(self._full_data.find_elements_by_tag_name('a'))
+        for pos in range(total_of_pedidos):
+
+            self.set_full_data(browser)
+            self._full_data.find_elements_by_tag_name('a')[pos].click()
+
+            pagesource = bs4.BeautifulSoup(browser.navegador.page_source,
+                                           "html5lib")
+
+            self._pedido_pagesource.append(pagesource)
+            pedido = self.process_pedidos(browser, pagesource)
+            pedido.upload_modified_attachments()
+            browser.navegador.back()
+        fix_attachment_name_and_extension()
+
     def process_pedidos(self, browser, page_source=None):
 
         # Existe a possibilidade da pagina não retornar um codigo fonte válido
@@ -240,13 +259,13 @@ class Pedidos(object):
         if page_source:
             pedido = ParsedPedido(page_source, browser)
             self._parsedpedidos.append(pedido) if pedido else None
+            return pedido
         else:
             self._parsedpedidos = list(p for p in (
                 ParsedPedido(pp, browser) for pp in self._pedido_pagesource
                 ) if p._main_data
             )
-
-        return self._parsedpedidos
+            return self._parsedpedidos
 
     def get_all_parsed_pedidos(self):
         return self._parsedpedidos
@@ -380,7 +399,7 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
     download_dir = flask.current_app.config['DOWNLOADS_PATH']
     downloaded_attachments = os.listdir(download_dir)
 
-    if filename not in [a for a in downloaded_attachments]:
+    if filename not in [a.decode('utf8') for a in downloaded_attachments]:
         logger.info("Arquivo {!r} não existe!.".format(filename))
         # TODO: O que fazer se o arquivo não estiver disponivel?
         # Já temos um caso onde o download não completa, mas por falha no
@@ -417,7 +436,7 @@ def update_pedidos_list(browser):
     pedidos = Pedidos()
     pedidos.set_full_data(browser)
     pedidos.get_all_pages_source(browser)
-    pedidos.process_pedidos(browser)
+    # pedidos.process_pedidos(browser)
 
     for pedido in pedidos.get_all_parsed_pedidos():
         save_pedido_into_db(pedido)
