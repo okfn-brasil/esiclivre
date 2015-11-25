@@ -181,7 +181,7 @@ class ParsedPedido(object):
             # old_created_at = old_created_at[0] if old_created_at else None
 
             # Download and upload attachments that created_at changed
-            if True or not old_created_at or (attachment.created_at != old_created_at):
+            if not old_created_at or (attachment.created_at != old_created_at):
                 logger.info(
                     'Anexo modificado ou novo. Baixando e enviando para IA.')
 
