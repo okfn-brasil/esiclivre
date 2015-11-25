@@ -226,8 +226,8 @@ class ParsedPedido(object):
                         logger.info("Sem downloads inacabados...")
                         break
                     else:
-                        logger.info("Aguardar 1 segundo...")
-                        time.sleep(1)
+                        logger.info("Aguardar 10 segundos...")
+                        time.sleep(10)
                         max_retries += 1
 
 
@@ -253,6 +253,7 @@ class Pedidos(object):
 
             self._pedido_pagesource.append(pagesource)
             pedido = self.process_pedidos(browser, pagesource)
+            fix_attachment_name_and_extension()
             pedido.upload_modified_attachments()
             browser.navegador.back()
         fix_attachment_name_and_extension()
