@@ -170,12 +170,18 @@ class ParsedPedido(object):
 
         for attachment in self.attachments:
             # Get last created_at time saved in DB
-            old_created_at = [a.created_at for a in db_attachments
-                              if a.name == attachment.filename]
-            old_created_at = old_created_at[0] if old_created_at else None
+            old_created_at = next(
+                (a.created_at
+                 for a in db_attachments
+                 if a.name == attachment.filename),
+                None
+            )
+            # old_created_at = [a.created_at for a in db_attachments
+            #                   if a.name == attachment.filename]
+            # old_created_at = old_created_at[0] if old_created_at else None
 
             # Download and upload attachments that created_at changed
-            if not old_created_at or (attachment.created_at != old_created_at):
+            if True or not old_created_at or (attachment.created_at != old_created_at):
                 logger.info(
                     'Anexo modificado ou novo. Baixando e enviando para IA.')
 
@@ -335,8 +341,14 @@ def create_pedido_attachments(pre_pedido):
         attachment = models.Attachment()
         attachment.created_at = item.created_at
         attachment.name = item.filename
-        attachment.ia_url = u'https://archive.org/download/pedido_{}/{}'.format(
-            pre_pedido.protocol, item.filename
+        base_url = 'https://archive.org/download'
+        attachment.ia_url = (
+            u'{base}/{prefix}_pedido_{protocol}/{filename}'.format(
+                base=base_url,
+                prefix=flask.current_app.config['ATTACHMENT_URL_PREFIX'],
+                protocol=pre_pedido.protocol,
+                filename=item.filename
+            )
         )
 
         extensions.db.session.add(attachment)
@@ -407,12 +419,18 @@ def upload_attachment_to_internet_archive(pedido_protocol, filename):
         return None
     else:
 
+        # try:
+        #     # get mediatype from file extension
+        #     mediatype = filename.rpartition('.')[2]
+        # except:
+        #     mediatype = None
+
         item = internetarchive.Item('{prefix}_pedido_{protocol}'.format(
             prefix=flask.current_app.config['ATTACHMENT_URL_PREFIX'],
             protocol=pedido_protocol))
         metadata = dict(
-            mediatype='pdf',
-            creator='OKF',
+            # mediatype=mediatype,
+            # creator='OKF',
             created_at=arrow.now().isoformat()
         )
         result = item.upload(
