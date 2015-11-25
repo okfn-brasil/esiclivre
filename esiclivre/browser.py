@@ -357,7 +357,7 @@ class ESicLivre(object):
                     if len(orgaos) < 5:
                         self.update_orgaos_list()
 
-                    pedidos_preproc.update_pedidos_list(self)
+                    # pedidos_preproc.update_pedidos_list(self)
 
                     counter = 0
                     while self.safe_dict['running']:
