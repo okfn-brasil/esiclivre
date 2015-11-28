@@ -349,7 +349,7 @@ class ESicLivre(object):
                     # Main loop
                     while self.safe_dict['running']:
                         self.main_loop()
-                        time.sleep(5)
+                        # time.sleep(5)
                 except:
                     raise
                 finally:
