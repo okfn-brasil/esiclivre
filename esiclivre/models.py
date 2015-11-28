@@ -175,6 +175,15 @@ class Pedido(db.Model):
         self.keywords.append(keyword)
 
 
+class OrgaosUpdate(db.Model):
+
+    __tablename__ = 'orgaos_update'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    date = db.Column(sa_utils.ArrowType, index=True)
+
+
 class Orgao(db.Model):
 
     __tablename__ = 'orgao'

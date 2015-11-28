@@ -25,6 +25,7 @@ import requests
 import shutil
 import random
 import time
+import pickle
 from multiprocessing import Process, Manager
 # from datetime import datetime
 
@@ -34,7 +35,7 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 import speech_recognition as sr
 
 from extensions import db
-from models import Orgao, PrePedido, PedidosUpdate
+from models import Orgao, PrePedido, PedidosUpdate, OrgaosUpdate
 from preprocessors import pedidos as pedidos_preproc
 
 
@@ -74,9 +75,27 @@ class ESicLivre(object):
         self.base_url = 'http://esic.prefeitura.sp.gov.br'
         self.login_url = self.base_url + '/Account/Login.aspx'
 
+        self.logado = False
+        self.ja_tentou_cookies_salvos = False
+        self.rodar_apenas_uma_vez = False
+
     def config(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+    def salvar_cookies(self):
+        '''Salva os cookies atuais do navegador.'''
+        pickle.dump(self.navegador.get_cookies(), open("cookies.pkl", "wb"))
+
+    def carregar_cookies(self):
+        '''Carrega os cookies do navegador salvos anteriormente.'''
+        try:
+            cookies = pickle.load(open("cookies.pkl", "rb"))
+        except:
+            return False
+        for cookie in cookies:
+            self.navegador.add_cookie(cookie)
+        return True
 
     def esta_em_login(self):
         # Verifica se está na página de login
@@ -297,6 +316,10 @@ class ESicLivre(object):
         process = Process(target=self.__run__)
         process.start()
 
+    def rodar_uma_vez(self):
+        self.rodar_apenas_uma_vez = True
+        self.__run__()
+
     def take_care_of_captcha(self):
         if not self.esta_em_login():
             self.ir_para_login()
@@ -335,53 +358,99 @@ class ESicLivre(object):
     def __stop_func__(self):
         self.safe_dict['running'] = False
 
+    def verificar_lista_orgaos(self):
+        # # Loads orgaos list if empty (or with only test data)
+        # orgaos = db.session.query(Orgao.name).all()
+        # if len(orgaos) < 5:
+        #     #     if (not self._last_update_of_orgao_list or
+        #     #        self._last_update_of_orgao_list.date() !=
+        #     #        arrow.utcnow().date()):
+        #     self.logger.info('Atualizando lista de orgaos...')
+        #     self.update_orgaos_list()
+
+        last_update = db.session.query(OrgaosUpdate).order_by(
+            OrgaosUpdate.date.desc()).first()
+
+        if last_update and last_update.date.date() == arrow.now().date():
+            return None
+        else:
+            self.logger.info('Atualizando lista de orgaos...')
+            self.update_orgaos_list()
+            db.session.add(OrgaosUpdate(date=arrow.now()))
+            db.session.commit()
+
+    def login_com_cookies_salvos(self):
+        '''Tenta usar cookies salvos para logar'''
+        self.ir_para_consultar_pedido()
+        self.carregar_cookies()
+        self.ir_para_consultar_pedido()
+        if not self.esta_em_login():
+            self.logado = True
+            self.logger.info("Old cookies seems to work!")
+
+    def login_com_captcha(self):
+        '''Tenta interagir com captcha'''
+        tentativas = 0
+        while not self.logado and tentativas < 10:
+            tentativas += 1
+            if self.try_break_audio_captcha:
+                captcha = self.take_care_of_captcha()
+            else:
+                captcha = self.get_captcha()
+            self.logger.info("Current captcha: %s" % captcha)
+            # If captcha is unset, may need to wait someone to set it
+            # If is set, login
+            if captcha:
+                self.logger.info("Trying to login...")
+                self.entrar_no_sistema(captcha)
+            if not self.esta_em_login():
+                self.logado = True
+                self.salvar_cookies()
+                self.logger.info("Seems to have logged in!")
+
     # Subprocess Functions
 
     def main_loop(self):
-        if self.try_break_audio_captcha:
-            captcha = self.take_care_of_captcha()
-        else:
-            captcha = self.get_captcha()
+        if not self.ja_tentou_cookies_salvos:
+            self.login_com_cookies_salvos()
+            self.ja_tentou_cookies_salvos = True
 
-        self.logger.info("Current captcha: %s" % captcha)
-        # If captcha is unset, may need to wait someone to set it
-        # If is set, login
-        if captcha:
-            self.logger.info("Trying to login...")
-            self.entrar_no_sistema(captcha)
-            if not self.esta_em_login():
-                self.logger.info("Seems to have logged in!")
-                try:
-                    # Loads orgaos list if empty (or with only test data)
-                    orgaos = db.session.query(Orgao.name).all()
-                    if len(orgaos) < 5:
-                        self.update_orgaos_list()
+        if not self.logado:
+            self.login_com_captcha()
 
-                    # pedidos_preproc.update_pedidos_list(self)
+        if self.logado:
+            try:
+                self.verificar_lista_orgaos()
 
-                    counter = 0
-                    while self.safe_dict['running']:
-                        # Keep alive; for how long? ...
-                        if counter == 120:
+                # pedidos_preproc.update_pedidos_list(self)
 
-                            if (not self._last_update_of_orgao_list or
-                               self._last_update_of_orgao_list.date() !=
-                               arrow.utcnow().date()):
-                                self.logger.info('Calling update_orgaos_list...')
-                                self.update_orgaos_list()
+                # counter = 0
+                while self.safe_dict['running']:
+                    # Keep alive; for how long? ...
+                    # if counter == 120:
 
-                            self.ir_para_registrar_pedido()
-                            self.ir_para_consultar_pedido()
-                            counter = 0
+                    #     if (not self._last_update_of_orgao_list or
+                    #        self._last_update_of_orgao_list.date() !=
+                    #        arrow.utcnow().date()):
+                    #         self.logger.info('Calling update_orgaos_list...')
+                    #         self.update_orgaos_list()
 
-                        # Main function
-                        self.active_loop()
+                    #     self.ir_para_registrar_pedido()
+                    #     self.ir_para_consultar_pedido()
+                    #     counter = 0
 
-                        counter += 1
-                        time.sleep(5)
+                    # Main function
+                    self.active_loop()
 
-                except LoginNeeded:
-                    self.logger.info("Seems to have been logged out...")
+                    if self.rodar_apenas_uma_vez:
+                        self.safe_dict['running'] = False
+                        return True
+
+                    # counter += 1
+                    time.sleep(5)
+
+            except LoginNeeded:
+                self.logger.info("Seems to have been logged out...")
 
             self.logger.info("Need new captcha...")
             self.preparar_receber_captcha()

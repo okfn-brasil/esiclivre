@@ -4,14 +4,21 @@
 from __future__ import unicode_literals  # unicode by default
 import os
 
-from flask.ext.script import Server, Manager, Shell
+from flask.ext.script import Manager, Shell
+from flask.ext.migrate import Migrate, MigrateCommand
 
 from esiclivre.app import create_app, db, sv
 
+app = create_app()
+manager = Manager(app)
 
-manager = Manager(create_app)
+# Migrations
+migrate = Migrate(app, db)
+manager.add_command('db', MigrateCommand)
 
 # manager.add_command('run', Server(port=5004))
+
+# Shell
 manager.add_command('shell', Shell(make_context=lambda: {
     'app': manager.app,
     'db': db,
@@ -31,6 +38,12 @@ def run(browserless=False):
             # Starts browser
             manager.app.browser.start()
     manager.app.run(port=5004)
+
+
+@manager.command
+def browser_once():
+    '''Run browser once.'''
+    manager.app.browser.rodar_uma_vez()
 
 
 @manager.command
