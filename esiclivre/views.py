@@ -187,6 +187,8 @@ class GetPedidoKeyword(Resource):
                     pedidos, key=lambda p: p.request_date, reverse=True
                 )
             ],
+            'prepedidos': [p for p in list_all_prepedidos()
+                           if keyword_name in p.keywords],
         }
 
 
@@ -218,6 +220,7 @@ class GetAuthor(Resource):
 
     def get(self, name):
         '''Returns pedidos marked with a specific keyword.'''
+        # TODO: endpoint dando erro
         try:
             author = (db.session.query(Author)
                       .options(joinedload('pedidos'))
@@ -257,18 +260,20 @@ class PrePedidoAPI(Resource):
 
     def get(self):
         '''List PrePedidos.'''
-        q = db.session.query(PrePedido, Author).filter_by(state='WAITING')
-        q = q.filter(PrePedido.author_id == Author.id)
+        return {'prepedidos': list_all_prepedidos()}
 
-        return {
-            'prepedidos': [{
-                'text': p.text,
-                'orgao': p.orgao_name,
-                'created': p.created_at.isoformat(),
-                'keywords': p.keywords,
-                'author': a.name,
+
+def list_all_prepedidos():
+    q = db.session.query(PrePedido, Author).filter_by(state='WAITING')
+    q = q.filter(PrePedido.author_id == Author.id)
+
+    return [{
+            'text': p.text,
+            'orgao': p.orgao_name,
+            'created': p.created_at.isoformat(),
+            'keywords': p.keywords,
+            'author': a.name,
             } for p, a in q.all()]
-        }
 
 
 def set_captcha_func(value):
