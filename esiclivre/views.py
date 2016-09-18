@@ -188,7 +188,7 @@ class GetPedidoKeyword(Resource):
                 )
             ],
             'prepedidos': [p for p in list_all_prepedidos()
-                           if keyword_name in p.keywords],
+                           if keyword_name in p['keywords']],
         }
 
 
