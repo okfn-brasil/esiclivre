@@ -63,7 +63,7 @@ setup(
         'python-social-auth==0.2.12',
         'pytz==2015.4',
         'PyYAML==3.11',
-        'requests==2.7.0',
+        'requests==2.12.4',
         'requests-oauthlib==0.5.0',
         'selenium==2.48.0',
         'six==1.7.3',
