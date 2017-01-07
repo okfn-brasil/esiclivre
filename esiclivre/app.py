@@ -13,11 +13,12 @@ from views import api
 from browser import ESicLivre
 
 
-def create_app():
+def create_app(settings_folder):
     # App
     app = Flask(__name__)
     app.config.from_pyfile('../settings/common.py', silent=False)
-    app.config.from_pyfile('../settings/local_settings.py', silent=False)
+    app.config.from_pyfile(
+        os.path.join(settings_folder, 'local_settings.py'), silent=False)
     configure_logging(app)
     CORS(app, resources={r"*": {"origins": "*"}})
 
@@ -25,7 +26,7 @@ def create_app():
     db.init_app(app)
 
     # Signer/Verifier
-    sv.config(pub_key_path="settings/keypub")
+    sv.config(pub_key_path=os.path.join(settings_folder, 'keypub'))
 
     # Browser
     browser = ESicLivre()
