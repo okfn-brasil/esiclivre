@@ -61,5 +61,10 @@ def initdb():
     db.session.commit()
 
 
+@manager.command
+def cleardb():
+    db.drop_all()
+
+
 if __name__ == '__main__':
     manager.run()
