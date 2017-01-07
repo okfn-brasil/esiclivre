@@ -27,7 +27,6 @@ setup(
         # 'bleach',
         # 'sqlalchemy-utils',
         # 'arrow',
-        # 'internetarchive',
         # 'psycopg2',  # for Postgres support
         'aniso8601==1.0.0',
         'arrow==0.7.0',
@@ -75,6 +74,7 @@ setup(
         'wheel==0.24.0',
         'viratoken',
         'viralata',
+        'internetarchive',
     ],
     keywords=['esic', 'microservice'],
     classifiers=[
